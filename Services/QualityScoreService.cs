@@ -49,4 +49,55 @@ public class QualityScoreService(AppDbContext db) : IQualityScoreService
             .ToList();
         return grouped;
     }
+
+    public async Task<List<DepartmentTrendDto>> GetDepartmentComplianceTrendAsync(string timeframe)
+    {
+        DateTime? cutoff = timeframe.ToLower() switch
+        {
+            "3m" => DateTime.UtcNow.AddMonths(-3),
+            "6m" => DateTime.UtcNow.AddMonths(-6),
+            "1y" => DateTime.UtcNow.AddMonths(-12),
+            "all" => null,
+            _ => throw new ArgumentException("Timeframe harus salah satu dari : 3m, 6m, 1y, all")
+        };
+        var query = db.AuditSessions
+            .Include(s => s.Schedule)
+            .Include(s => s.Responses)
+            .Where(s => s.Status == AuditSessionStatus.Completed && s.CompletedAt.HasValue)
+            .AsQueryable();
+
+        if (cutoff.HasValue)
+            query = query.Where(s => s.CompletedAt!.Value >= cutoff.Value);
+
+        var sessions = await query.ToListAsync();
+
+        var result = sessions
+            .GroupBy(s => s.Schedule.Department)
+            .Select(deptGroup => new DepartmentTrendDto
+            {
+                Department = deptGroup.Key,
+                Data = deptGroup
+                    .GroupBy(s => new { s.CompletedAt!.Value.Year, s.CompletedAt.Value.Month })
+                    .Select(periodGroup =>
+                        {
+                            var totalItems = periodGroup.Sum(s => s.Responses.Count);
+                            var totalConform = periodGroup.Sum(s => s.Responses.Count(r => r.Answer == ResponseAnswer.Conform));
+
+                            return new PeriodScoreDto
+                            {
+                                Year = periodGroup.Key.Year,
+                                Month = periodGroup.Key.Month,
+                                PeriodLabel = new DateTime(periodGroup.Key.Year, periodGroup.Key.Month, 1).ToString("MMM yyyy"),
+                                TotalSessions = periodGroup.Count(),
+                                ComplianceScore = totalItems == 0 ? 0 : Math.Round((double)totalConform / totalItems * 100, 1)
+                            };
+                        })
+                        .OrderBy(p => p.Year).ThenBy(p => p.Month)
+                        .ToList()
+            })
+            .OrderBy(d => d.Department)
+            .ToList();
+
+        return result;
+    }
 }
