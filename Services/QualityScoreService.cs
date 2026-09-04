@@ -41,8 +41,8 @@ public class QualityScoreService(AppDbContext db) : IQualityScoreService
                         Period = g.Key,
                         PeriodLabel = new DateTime(year, g.Key, 1).ToString("MMM yyyy"),
                         TotalSessions = g.Count(),
-                        ComplianceScore = totalItems == 0 ? 0 : Math.Round((double)totalConform / totalItems * 100, 1),
-                        QualityScore = totalConform == 0 ? 0 : Math.Round((double)totalAdjustedConform / totalConform * 100, 1)
+                        ComplianceScore = totalItems == 0 ? 0 : Math.Round((double)totalAdjustedConform / totalConform * 100, 1),
+                        QualityScore = totalConform == 0 ? 0 : Math.Round((double)totalConform / totalItems * 100, 1)
                     };
                 })
             .OrderBy(x => x.Period)
