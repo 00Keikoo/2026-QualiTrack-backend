@@ -46,6 +46,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
         mb.Entity<Finding>().HasIndex(f => f.Status);
         mb.Entity<CAPA>().HasIndex(c => new { c.Status, c.Deadline });
         mb.Entity<AuditSession>().HasIndex(s => s.ScheduleId);
+        mb.Entity<AuditSession>().HasIndex(s => new { s.Status, s.CompletedAt });
         mb.Entity<EvidenceFile>()
             .HasOne<Finding>()
             .WithMany(f => f.Evidences)
