@@ -140,6 +140,7 @@ public class SpcController(AppDbContext db) : ControllerBase
             "3m" => now.AddMonths(-3),
             "6m" => now.AddMonths(-6),
             "1y" => now.AddYears(-1),
+            "all" => DateTime.MinValue,
             _ => now.AddMonths(-3)
         };
 
