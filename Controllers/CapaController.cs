@@ -20,7 +20,9 @@ public class CapaController(AppDbContext db) : ControllerBase
     {
         var query = db.CAPAs
             .Include(c => c.Actions)
+                .ThenInclude(a => a.DoneBy)
             .Include(c => c.CloseOut)
+                .ThenInclude(co => co!.VerifiedById)
             .Include(c => c.Pic)
             .Include(c => c.Finding)
             .AsQueryable();
@@ -141,8 +143,12 @@ public class CapaController(AppDbContext db) : ControllerBase
     [Authorize(Roles = "Admin,QualityManager,AuditorInternal,Auditee")]
     public async Task<IActionResult> UpdateStatus(Guid id, [FromBody] CAPAStatus status)
     {
-        var capa = await db.CAPAs.FindAsync(id);
+        var capa = await db.CAPAs.Include(c => c.CloseOut).FirstOrDefaultAsync(c => c.Id == id);
         if (capa is null) return NotFound();
+
+        if (capa.Status == CAPAStatus.Closed && capa.CloseOut != null)
+            return BadRequest(new { message = "CAPA yang sudah ditutup dan terverifikasi tidak dapat diubah statusnya secara manual" });
+            
         capa.Status = status;
         await db.SaveChangesAsync();
         return NoContent();
@@ -167,7 +173,8 @@ public class CapaController(AppDbContext db) : ControllerBase
         };
 
         db.CAPAActions.Add(action);
-        capa.Status = CAPAStatus.InProgress;
+        if (capa.Status != CAPAStatus.Closed)
+            capa.Status = CAPAStatus.InProgress;
         await db.SaveChangesAsync();
 
         var doneBy = await db.Users.FindAsync(req.DoneById.Value);
@@ -265,6 +272,7 @@ public class CapaController(AppDbContext db) : ControllerBase
                 CapaId = a.CapaId,
                 Description = a.Description,
                 DoneById = a.DoneById,
+                DoneByName = a.DoneBy?.FullName,
                 DoneAt = a.DoneAt
             }).ToList(),
             CloseOut = capa.CloseOut == null ? null : new CloseOutResponseDto
@@ -274,6 +282,7 @@ public class CapaController(AppDbContext db) : ControllerBase
                 IsEffective = capa.CloseOut.IsEffective,
                 VerificationNotes = capa.CloseOut.VerificationNotes,
                 VerifiedById = capa.CloseOut.VerifiedById,
+                VerifiedByName = capa.CloseOut.VerifiedBy?.FullName,
                 VerifiedAt = capa.CloseOut.VerifiedAt
             }
         };

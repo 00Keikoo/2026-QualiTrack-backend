@@ -24,6 +24,9 @@ public class AuthController(AppDbContext db, IConfiguration config, IEmailServic
         if (!UserRoles.IsValidRole(req.Role))
             return BadRequest(new { message = "Role tidak valid. Pilih: QualityManager, AuditorInternal, Auditee, Admin" });
 
+        if (req.Role == "Admin")
+            return BadRequest(new { message = "Role admin tidak dapat didaftarkan secara mandiri. Hubungi adminstrator sistem. " });
+
         req = req with { Role = UserRoles.NormalizeRole(req.Role) };
 
         if (req.Password.Length < 6)

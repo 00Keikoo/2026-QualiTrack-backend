@@ -113,22 +113,27 @@ public class FindingController(AppDbContext db) : ControllerBase
         var finding = await db.Findings.FindAsync(id);
         if (finding is null) return NotFound();
 
-        string reporterName = req.ReporterName;
-        if (req.ReporterId.HasValue && string.IsNullOrEmpty(reporterName))
+        if (req.ReporterId.HasValue)
         {
-            var reporter = await db.Users.FindAsync(req.ReporterId.Value);
-            reporterName = reporter?.FullName ?? string.Empty;
+            finding.ReporterId = req.ReporterId;
+            if (!string.IsNullOrEmpty(req.ReporterName))
+            {
+                finding.ReporterName = req.ReporterName;
+            }
+            else
+            {
+                var reporter = await db.Users.FindAsync(req.ReporterId.Value);
+                finding.ReporterName = reporter?.FullName ?? finding.ReporterName;
+            }
         }
 
         finding.Title = req.Title;
         finding.Department = req.Department;
-        finding.ReporterName = reporterName;
-        finding.ReporterId = req.ReporterId;
         finding.Category = req.Category ?? finding.Category;
         finding.Description = req.Description;
         finding.ClauseRef = req.ClauseRef;
         await db.SaveChangesAsync();
-        return Ok(finding);
+        return Ok(MapToResponseDto(finding));
     }
 
     [HttpPatch("{id}/status")]
@@ -152,4 +157,20 @@ public class FindingController(AppDbContext db) : ControllerBase
         await db.SaveChangesAsync();
         return NoContent();
     }
+
+    private static FindingResponseDto MapToResponseDto(Finding f) => new()
+    {
+        Id = f.Id,
+        SessionId = f.SessionId,
+        ChecklistItemId = f.ChecklistItemId,
+        ReporterName = f.ReporterName,
+        ReporterId = f.ReporterId,
+        Title = f.Title,
+        Department = f.Department,
+        Category = f.Category,
+        Description = f.Description,
+        ClauseRef = f.ClauseRef,
+        FoundAt = f.FoundAt,
+        Status = f.Status
+    };
 }
