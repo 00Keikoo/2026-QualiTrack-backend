@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using QualiTrack.Data;
@@ -11,9 +12,11 @@ using QualiTrack.Data;
 namespace QualiTrack.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260917035920_AddTargetAndUnitToSpc")]
+    partial class AddTargetAndUnitToSpc
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -151,8 +154,6 @@ namespace QualiTrack.Migrations
 
                     b.HasIndex("ScheduleId");
 
-                    b.HasIndex("Status", "CompletedAt");
-
                     b.ToTable("AuditSessions");
                 });
 
@@ -251,8 +252,6 @@ namespace QualiTrack.Migrations
 
                     b.HasIndex("CapaId");
 
-                    b.HasIndex("DoneById");
-
                     b.ToTable("CAPAActions");
                 });
 
@@ -338,8 +337,6 @@ namespace QualiTrack.Migrations
 
                     b.HasIndex("CapaId")
                         .IsUnique();
-
-                    b.HasIndex("VerifiedById");
 
                     b.ToTable("CloseOutVerifications");
                 });
@@ -656,15 +653,7 @@ namespace QualiTrack.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("QualiTrack.Models.User", "DoneBy")
-                        .WithMany()
-                        .HasForeignKey("DoneById")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
                     b.Navigation("Capa");
-
-                    b.Navigation("DoneBy");
                 });
 
             modelBuilder.Entity("QualiTrack.Models.ChecklistItem", b =>
@@ -686,15 +675,7 @@ namespace QualiTrack.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("QualiTrack.Models.User", "VerifiedBy")
-                        .WithMany()
-                        .HasForeignKey("VerifiedById")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
                     b.Navigation("Capa");
-
-                    b.Navigation("VerifiedBy");
                 });
 
             modelBuilder.Entity("QualiTrack.Models.EvidenceFile", b =>
