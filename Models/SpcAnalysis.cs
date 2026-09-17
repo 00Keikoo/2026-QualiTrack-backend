@@ -3,7 +3,7 @@ namespace QualiTrack.Models;
 public class SpcAnalysis
 {
     public Guid Id { get; set; }
-    public string ProductName { get; set; } = string.Empty;  // Nama produk/parameter
+    public string ParameterName { get; set; } = string.Empty;  // Nama produk/parameter
     public string? Description { get; set; }
     public double Lsl { get; set; }
     public double Usl { get; set; }
@@ -19,4 +19,6 @@ public class SpcAnalysis
     public DateTime AnalyzedAt { get; set; } = DateTime.UtcNow;  
     public Guid AnalyzedById { get; set; }
     public User? AnalyzedBy { get; set; }
-}
+    public double? Target { get; set; }
+    public string? Unit { get; set;}
+ }

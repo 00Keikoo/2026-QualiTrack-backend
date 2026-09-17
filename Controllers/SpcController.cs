@@ -20,6 +20,8 @@ public class SpcController(AppDbContext db) : ControllerBase
         IFormFile file,
         [FromForm] double lsl,
         [FromForm] double usl,
+        [FromForm] Double? target,
+        [FromForm] string? unit,
         [FromForm] string productName,
         [FromForm] string? description)
     {
@@ -86,10 +88,12 @@ public class SpcController(AppDbContext db) : ControllerBase
         var analysis = new SpcAnalysis
         {
             Id = Guid.NewGuid(),
-            ProductName = productName,
+            ParameterName = productName,
             Description = description,
             Lsl = lsl,
             Usl = usl,
+            Target =target,
+            Unit = unit,
             Mean = Math.Round(mean, 4),
             StandardDeviation = Math.Round(stdDev, 4),
             Ucl = Math.Round(ucl, 4),
@@ -109,7 +113,7 @@ public class SpcController(AppDbContext db) : ControllerBase
         return Ok(new SpcResultDto
         {
             Id = analysis.Id,
-            ProductName = analysis.ProductName,
+            ParameterName = analysis.ParameterName,
             Description = analysis.Description,
             Mean = analysis.Mean,
             StandardDeviation = analysis.StandardDeviation,
@@ -149,7 +153,7 @@ public class SpcController(AppDbContext db) : ControllerBase
             .AsQueryable();
 
         if (!string.IsNullOrEmpty(productName))
-            query = query.Where(s => s.ProductName.Contains(productName));
+            query = query.Where(s => s.ParameterName.Contains(productName));
 
         if (!string.IsNullOrEmpty(status))
             query = query.Where(s => s.Status == status);
@@ -159,7 +163,7 @@ public class SpcController(AppDbContext db) : ControllerBase
             .Select(s => new SpcHistoryDto
             {
                 Id = s.Id,
-                ProductName = s.ProductName,
+                ProductName = s.ParameterName,
                 Description = s.Description,
                 Cp = s.Cp,
                 Cpk = s.Cpk,
@@ -190,7 +194,7 @@ public class SpcController(AppDbContext db) : ControllerBase
         return Ok(new SpcResultDto
         {
             Id = analysis.Id,
-            ProductName = analysis.ProductName,
+            ParameterName = analysis.ParameterName,
             Description = analysis.Description,
             Mean = analysis.Mean,
             StandardDeviation = analysis.StandardDeviation,
