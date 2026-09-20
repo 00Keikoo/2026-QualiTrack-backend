@@ -247,6 +247,7 @@ public class DashboardController(AppDbContext db) : ControllerBase
                     auditorName = s.Auditor?.FullName ?? s.AuditorName,
                     scheduledDate = s.ScheduledDate,
                     status = session == null ? "NotStarted" : session.Status.ToString(),
+                    sessionId = session?.Id,
                     totalFindings = sessionFindings.Count,
                     majorNC = sessionFindings.Count(f => f.Category == FindingCategory.MajorNC),
                     minorNC = sessionFindings.Count(f => f.Category == FindingCategory.MinorNC),
