@@ -92,7 +92,7 @@ public class SpcController(AppDbContext db) : ControllerBase
             Description = description,
             Lsl = lsl,
             Usl = usl,
-            Target =target,
+            Target = target,
             Unit = unit,
             Mean = Math.Round(mean, 4),
             StandardDeviation = Math.Round(stdDev, 4),
@@ -104,7 +104,8 @@ public class SpcController(AppDbContext db) : ControllerBase
             IsStable = !isUnstable,
             DataCount = data.Count,
             AnalyzedAt = DateTime.UtcNow,
-            AnalyzedById = userId
+            AnalyzedById = userId,
+            DataPoints = data.Select(d => Math.Round(d, 4)).ToList()
         };
 
         db.SpcAnalyses.Add(analysis);
@@ -208,7 +209,7 @@ public class SpcController(AppDbContext db) : ControllerBase
             DataCount = analysis.DataCount,
             AnalyzedAt = analysis.AnalyzedAt,
             IsStable = analysis.IsStable,
-            Data = []  // Data raw tidak disimpan di DB
+            Data = analysis.DataPoints
         });
     }
 

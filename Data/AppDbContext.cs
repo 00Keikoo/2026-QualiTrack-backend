@@ -53,6 +53,11 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             .HasForeignKey(e => e.FindingId)
             .IsRequired(false);
 
+        // Simpan data points SPC sebagai JSON
+        mb.Entity <SpcAnalysis>()
+            .Property(s => s.DataPoints)
+            .HasColumnType("jsonb");
+
         // Email harus unik
         mb.Entity<User>().HasIndex(u => u.Email).IsUnique();
     }

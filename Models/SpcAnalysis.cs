@@ -20,5 +20,6 @@ public class SpcAnalysis
     public Guid AnalyzedById { get; set; }
     public User? AnalyzedBy { get; set; }
     public double? Target { get; set; }
-    public string? Unit { get; set;}
+    public string? Unit { get; set; }
+    public List<double> DataPoints { get; set; } = [];
  }
