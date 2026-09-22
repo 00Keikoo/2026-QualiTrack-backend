@@ -237,12 +237,24 @@ public class SpcController(AppDbContext db) : ControllerBase
 
         var table = dataSet.Tables[0];
 
+        var valueCol = table.Columns
+            .Cast<System.Data.DataColumn>()
+            .FirstOrDefault(c => c.ColumnName.Trim()
+                .Equals("Value", StringComparison.OrdinalIgnoreCase));
+
+        int colIndex = valueCol?.Ordinal ?? table.Columns.Count - 1;
+
         foreach (System.Data.DataRow row in table.Rows)
         {
-            var cell = row[0];
+            var cell = row[colIndex];
             if (cell == null || cell == DBNull.Value) continue;
 
-            if (double.TryParse(cell.ToString(), out var value))
+            if (cell is double d)
+                data.Add(d);
+            else if (double.TryParse(cell.ToString(),
+                        System.Globalization.NumberStyles.Float,
+                        System.Globalization.CultureInfo.InvariantCulture,
+                        out var value))
                 data.Add(value);
         }
 
