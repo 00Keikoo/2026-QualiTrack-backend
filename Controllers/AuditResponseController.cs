@@ -107,7 +107,7 @@ public class AuditResponseController : ControllerBase
 
     // GET /api/AuditResponse/by-session/{sessionId}
     [HttpGet("by-session/{sessionId:guid}")]
-    [Authorize(Roles = "Admin,QualityManager,AuditorInternal")]
+    [Authorize(Roles = "Admin, QualityManager, AuditorInternal, Auditee")]
     public async Task<IActionResult> GetBySession(Guid sessionId)
     {
         var responses = await _db.AuditResponses

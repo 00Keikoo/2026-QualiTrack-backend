@@ -12,7 +12,7 @@ namespace QualiTrack.Controllers;
 public class QualityScoreController(IQualityScoreService qualityScoreService) : ControllerBase
 {
     [HttpGet("trend")]
-    [Authorize(Roles = "Admin, QualityManager, Auditor, AuditorInternal")]
+    [Authorize(Roles = "Admin, QualityManager, Auditor, AuditorInternal, Auditee")]
     public async Task<IActionResult> GetTrend([FromQuery] int? year)
     {
         var targetYear = year ?? DateTime.UtcNow.Year;
