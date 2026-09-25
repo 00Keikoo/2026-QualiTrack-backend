@@ -14,3 +14,12 @@ public class PeriodScoreDto
     public double ComplianceScore { get; set; }
     public int TotalSessions { get; set; }
 }
+
+public class OverallTrendDto
+{
+    public string PeriodLabel { get; set; } = string.Empty;
+    public int Year { get; set; }
+    public int Month { get; set; }
+    public double OverallScore { get; set; }
+    public int DepartmentCount { get; set; }
+}

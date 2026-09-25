@@ -16,7 +16,7 @@ public class DashboardController(AppDbContext db) : ControllerBase
     // Audit Summary: active audit, total capa, capa open, capa overdue
     // ============================================================
     [HttpGet("summary")]
-    [Authorize(Roles = "Admin,QualityManager,AuditorInternal")]
+    [Authorize(Roles = "Admin, QualityManager, AuditorInternal, Auditee")]
     public async Task<IActionResult> GetSummary([FromQuery] int? year)
     {
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
@@ -48,7 +48,7 @@ public class DashboardController(AppDbContext db) : ControllerBase
     // Compliance Score per department
     // ============================================================
     [HttpGet("compliance-score")]
-    [Authorize(Roles = "Admin,QualityManager,AuditorInternal")]
+    [Authorize(Roles = "Admin, QualityManager, AuditorInternal, Auditee")]
     public async Task<IActionResult> GetComplianceScore([FromQuery] int? year)
     {
         var targetYear = year ?? DateTime.UtcNow.Year;
@@ -126,7 +126,7 @@ public class DashboardController(AppDbContext db) : ControllerBase
 
     // GET /api/Dashboard/audit-schedule?month=10&year=2023
     [HttpGet("audit-schedule")]
-    [Authorize(Roles = "Admin,QualityManager,AuditorInternal")]
+    [Authorize(Roles = "Admin, QualityManager, AuditorInternal, Auditee")]
     public async Task<IActionResult> GetAuditSchedule(
         [FromQuery] int? month,
         [FromQuery] int? year)
@@ -171,7 +171,7 @@ public class DashboardController(AppDbContext db) : ControllerBase
     // Monthly Compliance Report untuk PDF
     // ============================================================
     [HttpGet("monthly-report")]
-    [Authorize(Roles = "Admin,QualityManager,AuditorInternal")]
+    [Authorize(Roles = "Admin, QualityManager, AuditorInternal, Auditee")]
     public async Task<IActionResult> GetMonthlyReport(
         [FromQuery] int? month,
         [FromQuery] int? year)
