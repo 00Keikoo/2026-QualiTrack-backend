@@ -100,4 +100,25 @@ public class QualityScoreService(AppDbContext db) : IQualityScoreService
 
         return result;
     }
+
+    public async Task<List<OverallTrendDto>> GetOverallComplianceTrendAsync(string timeframe)
+    {
+        var departmentTrends = await GetDepartmentComplianceTrendAsync(timeframe);
+    
+        var result = departmentTrends
+            .SelectMany(d => d.Data)
+            .GroupBy(p => new { p.Year, p.Month })
+            .Select(g => new OverallTrendDto
+            {
+                Year = g.Key.Year,
+                Month = g.Key.Month,
+                PeriodLabel = new DateTime(g.Key.Year, g.Key.Month, 1).ToString("MMM yyyy"),
+                OverallScore = Math.Round(g.Average(p => p.ComplianceScore), 0),
+                DepartmentCount = g.Count()
+            })
+            .OrderBy(x => x.Year).ThenBy(x => x.Month)
+            .ToList();
+    
+        return result;
+    }
 }

@@ -21,12 +21,27 @@ public class QualityScoreController(IQualityScoreService qualityScoreService) : 
     }
 
     [HttpGet("department-trend")]
-    [Authorize(Roles = "Admin, QualityManager, Auditor, AuditorInternal")]
+    [Authorize(Roles = "Admin, QualityManager, Auditor, AuditorInternal, Auditee")]
     public async Task<IActionResult> GetDepartmentTrend([FromQuery] string timeframe = "all")
     {
         try
         {
             var trend = await qualityScoreService.GetDepartmentComplianceTrendAsync(timeframe);
+            return Ok(trend);
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    [HttpGet("overall-trend")]
+    [Authorize(Roles = "Admin, QualityManager, Auditor, AuditorInternal, Auditee")]
+    public async Task<IActionResult> GetOverallTrend([FromQuery] string timeframe = "all")
+    {
+        try
+        {
+            var trend = await qualityScoreService.GetOverallComplianceTrendAsync(timeframe);
             return Ok(trend);
         }
         catch (ArgumentException ex)
