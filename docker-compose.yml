@@ -4,9 +4,9 @@ services:
     container_name: qualitrack_db
     restart: unless-stopped
     environment:
-      POSTGRES_DB: qualitrack
-      POSTGRES_USER: qualitrack_user
-      POSTGRES_PASSWORD: QualiTrack@2025!
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:
@@ -41,7 +41,7 @@ services:
     environment:
       - ASPNETCORE_ENVIRONMENT=Production
       - ASPNETCORE_URLS=http://+:5144
-      - ConnectionStrings__Supabase=Host=db;Port=5432;Database=qualitrack;Username=qualitrack_user;Password=QualiTrack@2025!
+      - ConnectionStrings__Supabase=Host=db;Port=5432;Database=${POSTGRES_DB};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD}
       - Jwt__Key=${JWT_SECRET}
       - Jwt__Issuer=QualiTrack
       - Jwt__Audience=QualiTrack

@@ -65,12 +65,12 @@ public class QualityScoreService(AppDbContext db) : IQualityScoreService
             .Include(s => s.Responses)
             .Where(s => s.Status == AuditSessionStatus.Completed && s.CompletedAt.HasValue)
             .AsQueryable();
-
+    
         if (cutoff.HasValue)
             query = query.Where(s => s.CompletedAt!.Value >= cutoff.Value);
-
+    
         var sessions = await query.ToListAsync();
-
+    
         var result = sessions
             .GroupBy(s => s.Schedule.Department)
             .Select(deptGroup => new DepartmentTrendDto
@@ -82,7 +82,7 @@ public class QualityScoreService(AppDbContext db) : IQualityScoreService
                         {
                             var totalItems = periodGroup.Sum(s => s.Responses.Count);
                             var totalConform = periodGroup.Sum(s => s.Responses.Count(r => r.Answer == ResponseAnswer.Conform));
-
+    
                             return new PeriodScoreDto
                             {
                                 Year = periodGroup.Key.Year,
@@ -97,7 +97,7 @@ public class QualityScoreService(AppDbContext db) : IQualityScoreService
             })
             .OrderBy(d => d.Department)
             .ToList();
-
+    
         return result;
     }
 
