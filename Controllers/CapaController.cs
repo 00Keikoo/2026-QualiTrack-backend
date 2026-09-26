@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
+using System.Security.Claims;
 using QualiTrack.Data;
 using QualiTrack.Models;
 using QualiTrack.DTOs;
@@ -29,8 +30,12 @@ public class CapaController(AppDbContext db) : ControllerBase
 
         if (status.HasValue) query = query.Where(c => c.Status == status);
 
+        if (User.IsInRole("Auditee"))
+        {
+            var userId = Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
+            query = query.Where(c => c.PicId == userId);
+        }
         var capas = await query.ToListAsync();
-
         var response = capas.Select(MapToResponseDto).ToList();
 
         return Ok(response);
@@ -41,13 +46,20 @@ public class CapaController(AppDbContext db) : ControllerBase
     public async Task<IActionResult> GetOverdue()
     {
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
-        var overdue = await db.CAPAs
+        var query = db.CAPAs
             .Where(c => c.Deadline < today && c.Status != CAPAStatus.Closed)
             .Include(c => c.Actions)
             .Include(c => c.Pic)
             .Include(c => c.Finding)
-            .ToListAsync();
+            .AsQueryable();
 
+        if (User.IsInRole("Auditee"))
+        {
+            var userId = Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
+            query = query.Where(c => c.PicId == userId);
+        }
+
+        var overdue  = await query.ToListAsync();
         var response = overdue.Select(c => MapToResponseDto(c)).ToList();
         return Ok(response);
     }
@@ -64,6 +76,12 @@ public class CapaController(AppDbContext db) : ControllerBase
             .FirstOrDefaultAsync(c => c.Id == id);
 
         if (capa is null) return NotFound();
+
+        if (User.IsInRole("Auditee"))
+        {
+            var userId = Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
+            if (capa.PicId != userId) return Forbid();
+        }
         return Ok(MapToResponseDto(capa));
     }
 
@@ -123,6 +141,13 @@ public class CapaController(AppDbContext db) : ControllerBase
     {
         var capa = await db.CAPAs.FindAsync(id);
         if (capa is null) return NotFound();
+
+        if (User.IsInRole("Auditee"))
+        {
+            var userId = Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
+            if (capa.PicId != userId) return Forbid();
+        }
+
         if (!req.Deadline.HasValue)
             return BadRequest(new { message = "Deadline wajib diisi" });
         if (req.PicId.HasValue && req.PicId == Guid.Empty)
@@ -145,6 +170,11 @@ public class CapaController(AppDbContext db) : ControllerBase
     {
         var capa = await db.CAPAs.Include(c => c.CloseOut).FirstOrDefaultAsync(c => c.Id == id);
         if (capa is null) return NotFound();
+        if (User.IsInRole("Auditee"))
+        {
+            var userId = Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
+            if (capa.PicId != userId) return Forbid();
+        }
 
         if (capa.Status == CAPAStatus.Closed && capa.CloseOut != null)
             return BadRequest(new { message = "CAPA yang sudah ditutup dan terverifikasi tidak dapat diubah statusnya secara manual" });
@@ -160,6 +190,11 @@ public class CapaController(AppDbContext db) : ControllerBase
     {
         var capa = await db.CAPAs.FindAsync(id);
         if (capa is null) return NotFound();
+        if (User.IsInRole("Auditee"))
+        {
+            var userId = Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
+            if (capa.PicId != userId) return Forbid();
+        }
         if (!req.DoneById.HasValue || req.DoneById == Guid.Empty)
             return BadRequest(new { message = "DoneById harus diisi dan bukan Guid kosong" });
 
@@ -195,7 +230,13 @@ public class CapaController(AppDbContext db) : ControllerBase
     public async Task<IActionResult> CloseOut(Guid id, [FromBody] CloseOutVerificationRequest req)
     {
         var capa = await db.CAPAs.FirstOrDefaultAsync(c => c.Id == id);
+
         if (capa is null) return NotFound();
+        if (User.IsInRole("Auditee"))
+        {
+            var userId = Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
+            if (capa.PicId != userId) return Forbid();
+        }
         if (!req.IsEffective.HasValue)
             return BadRequest(new { message = "IsEffective wajib diisi" });
         if (!req.VerifiedById.HasValue || req.VerifiedById == Guid.Empty)
