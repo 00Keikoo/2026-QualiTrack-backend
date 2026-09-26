@@ -52,20 +52,29 @@ public class QualityScoreService(AppDbContext db) : IQualityScoreService
 
     public async Task<List<DepartmentTrendDto>> GetDepartmentComplianceTrendAsync(string timeframe)
     {
+        var startOfCurrentMonth = new DateTime(DateTime.UtcNow.Year, DateTime.UtcNow.Month, 1);
+        
         DateTime? cutoff = timeframe.ToLower() switch
         {
-            "3m" => new DateTime(DateTime.UtcNow.Year, DateTime.UtcNow.Month, 1).AddMonths(-2),
-            "6m" => new DateTime(DateTime.UtcNow.Year, DateTime.UtcNow.Month, 1).AddMonths(-5),
-            "1y" => new DateTime(DateTime.UtcNow.Year, DateTime.UtcNow.Month, 1).AddMonths(-11),
+            "3m" => startOfCurrentMonth.AddMonths(-3),
+            "6m" => startOfCurrentMonth.AddMonths(-6),
+            "1y" => startOfCurrentMonth.AddMonths(-12),
             "all" => null,
             _ => throw new ArgumentException("Timeframe harus salah satu dari : 3m, 6m, 1y, all")
         };
         var query = db.AuditSessions
             .Include(s => s.Schedule)
             .Include(s => s.Responses)
-            .Where(s => s.Status == AuditSessionStatus.Completed && s.CompletedAt.HasValue)
+            .Where(s => s.Status == AuditSessionStatus.Completed
+                && s.CompletedAt.HasValue
+                && s.CompletedAt.Value < startOfCurrentMonth)
             .AsQueryable();
-    
+
+        
+        // Exclude bulan berjalan HANYA untuk timeframe yang membandingkan periode closed
+        if (timeframe.ToLower() != "all")
+            query = query.Where(s => s.CompletedAt!.Value < startOfCurrentMonth);
+            
         if (cutoff.HasValue)
             query = query.Where(s => s.CompletedAt!.Value >= cutoff.Value);
     
