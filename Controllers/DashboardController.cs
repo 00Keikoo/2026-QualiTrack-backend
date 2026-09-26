@@ -243,6 +243,8 @@ public class DashboardController(AppDbContext db) : ControllerBase
 
                 return new
                 {
+                    scheduleId = s.Id,
+                    planId = s.AuditPlanId,
                     department = s.Department,
                     auditorName = s.Auditor?.FullName ?? s.AuditorName,
                     scheduledDate = s.ScheduledDate,

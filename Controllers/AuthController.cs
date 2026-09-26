@@ -38,6 +38,11 @@ public class AuthController(AppDbContext db, IConfiguration config, IEmailServic
             if(existingUser.EmailVerified)
                 return BadRequest(new { message = "Email sudah terdaftar"});
 
+            // Daftar ulang sebelum verifikasi: pakai data terbaru dari form (termasuk role)
+            existingUser.FullName = req.FullName;
+            existingUser.Role = req.Role;
+            existingUser.PasswordHash = BCrypt.Net.BCrypt.HashPassword(req.Password);
+
             var newOtp = new Random().Next(1000, 9999).ToString();
             existingUser.OtpCode = BCrypt.Net.BCrypt.HashPassword(newOtp);
             existingUser.OtpExpiry = DateTime.UtcNow.AddMinutes(5);

@@ -45,7 +45,7 @@ public class KpiService(AppDbContext db) : IKpiService
         var totalFindingReported = await db.Findings
             .CountAsync(f => f.ReporterId == userId);
 
-        return new KpiDto
+        var kpi = new KpiDto
         {
             TotalAssigned = userCapas.Count,
             TotalCompleted = closedCapas.Count,
@@ -109,5 +109,77 @@ public class KpiService(AppDbContext db) : IKpiService
                 ? 0
                 : Math.Round((double)completedOnTime / completed.Count * 100, 1)
         };
+
+        var role = await db.Users
+            .Where(u => u.Id == userId)
+            .Select(u => u.Role)
+            .FirstOrDefaultAsync();
+
+        var today = DateTime.UtcNow.Date;
+
+        if (role == UserRoles.Auditee)
+        {
+            // Auditee: tugasnya adalah CAPA yang ditugaskan ke dia (PIC)
+            var openPastDeadline = userCapas.Count(c =>
+                c.Status != CAPAStatus.Closed &&
+                c.Deadline < DateOnly.FromDateTime(today));
+
+            SetTaskKpi(kpi, "Capa",
+                assigned: userCapas.Count,
+                completed: closedCapas.Count,
+                completedOnTime: closedOnTime,
+                notCompletedPastDue: openPastDeadline);
+            return kpi;
+        }
+
+        // Auditor: tugasnya adalah jadwal audit yang ditugaskan ke dia + sesi terakhirnya
+        var audits = await db.AuditSchedules
+            .Where(s => s.AuditorId == userId)
+            .Select(s => new
+            {
+                s.ScheduledDate,
+                Session = db.AuditSessions
+                    .Where(x => x.ScheduleId == s.Id)
+                    .OrderByDescending(x => x.CreatedAt)
+                    .Select(x => new { x.Status, x.CompletedAt })
+                    .FirstOrDefault()
+            })
+            .ToListAsync();
+
+        // Audit yang dibatalkan tidak dihitung sebagai tugas
+        audits = audits
+            .Where(a => a.Session is null || a.Session.Status != AuditSessionStatus.Cancelled)
+            .ToList();
+
+        var completedAudits = audits
+            .Where(a => a.Session is { Status: AuditSessionStatus.Completed })
+            .ToList();
+
+        var auditsOnTime = completedAudits.Count(a =>
+            a.Session!.CompletedAt.HasValue &&
+            a.Session.CompletedAt.Value.Date <= a.ScheduledDate.Date);
+
+        var auditsPastDue = audits.Count(a =>
+            a.Session is not { Status: AuditSessionStatus.Completed } &&
+            a.ScheduledDate.Date < today);
+
+        SetTaskKpi(kpi, "Audit",
+            assigned: audits.Count,
+            completed: completedAudits.Count,
+            completedOnTime: auditsOnTime,
+            notCompletedPastDue: auditsPastDue);
+        return kpi;
+    }
+
+    // Overdue = selesai lewat tenggat + belum selesai padahal tenggat sudah lewat
+    private static void SetTaskKpi(KpiDto kpi, string basis, int assigned, int completed, int completedOnTime, int notCompletedPastDue)
+    {
+        kpi.KpiBasis = basis;
+        kpi.TotalAssigned = assigned;
+        kpi.TotalCompleted = completed;
+        kpi.TotalCompletedOnTime = completedOnTime;
+        kpi.TotalOverdue = (completed - completedOnTime) + notCompletedPastDue;
+        kpi.QualityScore = completed == 0 ? 0 : (double)completedOnTime / completed;
+        kpi.SuccessRate = assigned == 0 ? 0 : (double)completed / assigned;
     }
 }
