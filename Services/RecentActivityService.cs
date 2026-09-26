@@ -7,6 +7,9 @@ namespace QualiTrack.Services;
 
 public class RecentActivityService(AppDbContext db) : IRecentActivityService
 {
+
+    private static readonly TimeZoneInfo WibTimeZone = TimeZoneInfo.FindSystemTimeZoneById("Asia/Jakarta");
+    
     public async Task<List<RecentActivityDto>> GetUserRecentActivityAsync(Guid userId, int limit = 10)
     {
         var capaActions = await db.CAPAActions
@@ -58,12 +61,21 @@ public class RecentActivityService(AppDbContext db) : IRecentActivityService
             })
             .ToListAsync();
 
-        return capaActions
+        var result = capaActions
             .Concat(verifications)
             .Concat(reportedFindings)
             .Concat(completedAudits)
             .OrderByDescending(a => a.Timestamp)
             .Take(limit)
             .ToList();
+
+        foreach (var activity in result)
+        {
+            activity.Timestamp = TimeZoneInfo.ConvertTimeFromUtc(
+                DateTime.SpecifyKind(activity.Timestamp, DateTimeKind.Utc),
+                WibTimeZone);
+        }
+
+        return result;
     }
 }
