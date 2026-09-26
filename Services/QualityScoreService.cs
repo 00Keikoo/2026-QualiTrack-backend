@@ -54,9 +54,9 @@ public class QualityScoreService(AppDbContext db) : IQualityScoreService
     {
         DateTime? cutoff = timeframe.ToLower() switch
         {
-            "3m" => DateTime.UtcNow.AddMonths(-3),
-            "6m" => DateTime.UtcNow.AddMonths(-6),
-            "1y" => DateTime.UtcNow.AddMonths(-12),
+            "3m" => new DateTime(DateTime.UtcNow.Year, DateTime.UtcNow.Month, 1).AddMonths(-2),
+            "6m" => new DateTime(DateTime.UtcNow.Year, DateTime.UtcNow.Month, 1).AddMonths(-5),
+            "1y" => new DateTime(DateTime.UtcNow.Year, DateTime.UtcNow.Month, 1).AddMonths(-11),
             "all" => null,
             _ => throw new ArgumentException("Timeframe harus salah satu dari : 3m, 6m, 1y, all")
         };
