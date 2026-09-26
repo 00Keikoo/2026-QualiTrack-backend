@@ -23,7 +23,7 @@ public class CapaController(AppDbContext db) : ControllerBase
             .Include(c => c.Actions)
                 .ThenInclude(a => a.DoneBy)
             .Include(c => c.CloseOut)
-                .ThenInclude(co => co!.VerifiedById)
+                .ThenInclude(co => co!.VerifiedBy)
             .Include(c => c.Pic)
             .Include(c => c.Finding)
             .AsQueryable();

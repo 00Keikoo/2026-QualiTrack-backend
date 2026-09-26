@@ -24,7 +24,7 @@ public class AuditPlanController : ControllerBase
     }
 
     [HttpGet]
-    [Authorize(Roles = "Admin,QualityManager,AuditorInternal")]
+    [Authorize(Roles = "Admin,QualityManager,AuditorInternal, Auditee")]
     public async Task<IActionResult> GetAll()
     {
         var plansQuery = _db.AuditPlans
@@ -83,7 +83,7 @@ public class AuditPlanController : ControllerBase
     }
 
     [HttpGet("{id}")]
-    [Authorize(Roles = "Admin,QualityManager,AuditorInternal")]
+    [Authorize(Roles = "Admin,QualityManager,AuditorInternal, Auditee")]
     public async Task<IActionResult> GetById(Guid id)
     {
         var plan = await _db.AuditPlans

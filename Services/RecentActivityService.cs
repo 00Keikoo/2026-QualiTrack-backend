@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using QualiTrack.DTOs;
 using QualiTrack.Data;
+using QualiTrack.Models;
 
 namespace QualiTrack.Services;
 
@@ -34,7 +35,8 @@ public class RecentActivityService(AppDbContext db) : IRecentActivityService
 
         var reportedFindings = await db.Findings
             .Where(f => f.ReporterId == userId)
-            .Select(f => new RecentActivityDto {
+            .Select(f => new RecentActivityDto
+            {
                 ActivityType = "FindingReported",
                 Description = $"Melaporkan finding: {f.Title}",
                 Timestamp = f.FoundAt,
@@ -42,9 +44,24 @@ public class RecentActivityService(AppDbContext db) : IRecentActivityService
             })
             .ToListAsync();
 
+        var completedAudits = await db.AuditSessions
+            .Include(s => s.Schedule)
+            .Where(s => s.Schedule.AuditorId == userId
+                && s.Status == AuditSessionStatus.Completed
+                && s.CompletedAt.HasValue)
+            .Select(s => new RecentActivityDto
+            {
+                ActivityType = "AuditCompleted",
+                Description = $"Menyelesaikan audit: {s.Schedule.ClauseRef} - {s.Schedule.Department}",
+                Timestamp = s.CompletedAt!.Value,
+                RelatedId = s.Id
+            })
+            .ToListAsync();
+
         return capaActions
             .Concat(verifications)
             .Concat(reportedFindings)
+            .Concat(completedAudits)
             .OrderByDescending(a => a.Timestamp)
             .Take(limit)
             .ToList();

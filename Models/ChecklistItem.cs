@@ -4,7 +4,7 @@ namespace QualiTrack.Models;
 
 public class ChecklistItem
 {
-     public Guid Id { get; set; }
+    public Guid Id { get; set; }
     public Guid ChecklistId { get; set; }
     public Checklist? Checklist { get; set; }
     public string Question { get; set; } = string.Empty;
