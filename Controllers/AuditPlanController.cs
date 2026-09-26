@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Protocols;
+using System.Security.Claims;
 using QualiTrack.Data;
 using QualiTrack.DTOs;
 using QualiTrack.Filters;
@@ -26,40 +27,56 @@ public class AuditPlanController : ControllerBase
     [Authorize(Roles = "Admin,QualityManager,AuditorInternal")]
     public async Task<IActionResult> GetAll()
     {
-        var plans = await _db.AuditPlans
+        var plansQuery = _db.AuditPlans
             .Include(a => a.Schedules)
                 .ThenInclude(s => s.Auditor)
             .OrderByDescending(a => a.CreatedAt)
-            .ToListAsync();
+            .AsQueryable();
+        
+        Guid? currentUserId = null;
+        if (User.IsInRole("AuditorInternal"))
+        {
+            currentUserId = Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
+            plansQuery = plansQuery.Where(p => p.Schedules.Any(s => s.AuditorId ==currentUserId));
+        }
+
+        var plans = await plansQuery.ToListAsync();
 
         var completedTimes = await _db.AuditSessions
             .Where(s => s.Status == AuditSessionStatus.Completed)
             .ToDictionaryAsync(s => s.ScheduleId, s => s.CompletedAt);
 
-        var result = plans.Select(plan => new AuditPlanResponseDto
+        var result = plans.Select(plan =>
         {
-            Id = plan.Id,
-            Title = plan.Title,
-            Year = plan.Year,
-            Standard = plan.Standard,
-            CreatedAt = plan.CreatedAt,
-            Description = plan.Description,
-            Priority = plan.Priority,
-            TotalSchedules = plan.Schedules.Count,
-            Schedules = plan.Schedules.Select(s => new ScheduleResponseDto
-            {
-                Id = s.Id,
-                ClauseRef = s.ClauseRef,
-                AuditorId = s.AuditorId ?? Guid.Empty,
-                AuditorName = s.Auditor != null
-                    ? s.Auditor.FullName
-                    : s.AuditorName,  // Fallback ke AuditorName jika join gagal
-                ScheduledDate = s.ScheduledDate,
-                Department = s.Department,
+            var schedules = currentUserId.HasValue
+                ? plan.Schedules.Where(s => s.AuditorId == currentUserId).ToList()
+                : plan.Schedules.ToList();
 
-                IsFinished = completedTimes.ContainsKey(s.Id),
-                CompletedAt = completedTimes.GetValueOrDefault(s.Id)
-            }).ToList()
+            return new AuditPlanResponseDto
+            {
+                Id = plan.Id,
+                Title = plan.Title,
+                Year = plan.Year,
+                Standard = plan.Standard,
+                CreatedAt = plan.CreatedAt,
+                Description = plan.Description,
+                Priority = plan.Priority,
+                TotalSchedules = plan.Schedules.Count,
+                Schedules = plan.Schedules.Select(s => new ScheduleResponseDto
+                {
+                    Id = s.Id,
+                    ClauseRef = s.ClauseRef,
+                    AuditorId = s.AuditorId ?? Guid.Empty,
+                    AuditorName = s.Auditor != null
+                        ? s.Auditor.FullName
+                        : s.AuditorName,  // Fallback ke AuditorName jika join gagal
+                    ScheduledDate = s.ScheduledDate,
+                    Department = s.Department,
+
+                    IsFinished = completedTimes.ContainsKey(s.Id),
+                    CompletedAt = completedTimes.GetValueOrDefault(s.Id)
+                }).ToList()
+            };
         });
         
         return Ok(new { message = "Data audit plan berhasil diambil", total = plans.Count, data = result });
@@ -77,9 +94,21 @@ public class AuditPlanController : ControllerBase
         if (plan is null)
             return NotFound(new { message = $"Audit plan dengan ID {id} tidak ditemukan", id = id });
         
+        Guid? currentUserId = null;
+        if (User.IsInRole("AuditorInternal"))
+        {
+            currentUserId = Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
+            if(!plan.Schedules.Any(s => s.AuditorId == currentUserId))
+                return Forbid();
+        }
+
         var CompletedTimes = await _db.AuditSessions
             .Where(s => s.Status == AuditSessionStatus.Completed)
             .ToDictionaryAsync(s => s.ScheduleId, s => s.CompletedAt);
+
+        var schedules = currentUserId.HasValue
+            ? plan.Schedules.Where(s => s.AuditorId == currentUserId).ToList()
+            :plan.Schedules.ToList();
 
         var result = new AuditPlanResponseDto
         {
