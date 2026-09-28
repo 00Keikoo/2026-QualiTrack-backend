@@ -18,7 +18,8 @@ var connectionString = builder.Configuration.GetConnectionString("Supabase")
 builder.Services.AddDbContext<AppDbContext>(opt =>
     opt.UseNpgsql(connectionString));
 
-// JWT AUTHvar jwtSection = builder.Configuration.GetSection("Jwt");
+// JWT AUTH
+var jwtSection = builder.Configuration.GetSection("Jwt");
 var jwtKey = jwtSection["Key"]!;
 var jwtIssuer = jwtSection["Issuer"]!;
 var jwtAudience = jwtSection["Audience"]!;
