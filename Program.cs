@@ -11,19 +11,14 @@ AppContext.SetSwitch("Npgsql.EnableLegacyTimestampBehavior", true);
 
 var builder = WebApplication.CreateBuilder(args);
 
-// ===============================================================================
-// 1. DATABASE
-// ===============================================================================
+//DATABASE
 var connectionString = builder.Configuration.GetConnectionString("Supabase")
     ?? throw new InvalidOperationException("Connection string 'Supabase' not found.");
 
 builder.Services.AddDbContext<AppDbContext>(opt =>
     opt.UseNpgsql(connectionString));
 
-// ===============================================================================
-// 2. JWT AUTH
-// ===============================================================================
-var jwtSection = builder.Configuration.GetSection("Jwt");
+// JWT AUTHvar jwtSection = builder.Configuration.GetSection("Jwt");
 var jwtKey = jwtSection["Key"]!;
 var jwtIssuer = jwtSection["Issuer"]!;
 var jwtAudience = jwtSection["Audience"]!;
@@ -50,7 +45,10 @@ builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowFrontend", policy =>
     {
-        policy.WithOrigins("http://localhost:5173")
+        policy.WithOrigins(
+            "http://localhost:5173",
+            "https://qualitrack.my.id",
+            "https://www.qualitrack.my.id")
               .AllowAnyHeader()
               .AllowAnyMethod()
               .AllowCredentials();
