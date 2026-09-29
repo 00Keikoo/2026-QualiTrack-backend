@@ -11,6 +11,7 @@ using QualiTrack.Models;
 public class ChecklistController(AppDbContext db) : ControllerBase
 {
     [HttpGet]
+    [Authorize(Roles = "Admin, QualityManager, AuditorInternal")]
     public async Task<IActionResult> GetAll(
         [FromQuery] string? standard,
         [FromQuery] string? department)
@@ -39,6 +40,7 @@ public class ChecklistController(AppDbContext db) : ControllerBase
     }
 
     [HttpGet("{id}")]
+    [Authorize(Roles = "Admin, QualityManager, AuditorInternal")]
     public async Task<IActionResult> GetById(Guid id)
     {
         var checklist = await db.Checklists
