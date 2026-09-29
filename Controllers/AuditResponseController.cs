@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using System.Security.Claims;
 using QualiTrack.Data;
 using QualiTrack.DTOs;
 using QualiTrack.Filters;
@@ -29,6 +30,13 @@ public class AuditResponseController : ControllerBase
         var session = await _db.AuditSessions.FindAsync(dto.SessionId);
         if (session is null)
             return NotFound(new { message = $"Session {dto.SessionId} tidak ditemukan" });
+
+        if (User.IsInRole("AuditorInternal"))
+        {
+            var currentUserId = Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
+            if (session.Schedule?.AuditorId != currentUserId)
+                return Forbid();
+        }
 
         if (session.Status == AuditSessionStatus.Completed)
             return BadRequest(new { message = "Session sudah selesai, jawaban tidak bisa diubah" });
@@ -65,10 +73,19 @@ public class AuditResponseController : ControllerBase
     [Authorize(Roles = "Admin,QualityManager,AuditorInternal")]
     public async Task<IActionResult> SaveProgress([FromBody] SaveProgressDto dto)
     {
-        var session = await _db.AuditSessions.FindAsync(dto.SessionId);
+        var session = await _db.AuditSessions
+            .Include(s => s.Schedule)
+            .FirstOrDefaultAsync(s => s.Id == dto.SessionId);
         if (session is null)
             return NotFound(new { message = $"Session {dto.SessionId} tidak ditemukan" });
 
+        if (User.IsInRole("AuditorInternal"))
+        {
+            var currentUserId = Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
+            if (session.Schedule?.AuditorId != currentUserId)
+                return Forbid();
+        }
+            
         if (session.Status == AuditSessionStatus.Completed)
             return BadRequest(new { message = "Session sudah selesai" });
 

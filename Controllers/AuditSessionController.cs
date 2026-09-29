@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using System.Security.Claims;
 using QualiTrack.Data;
 using QualiTrack.DTOs;
 using QualiTrack.Filters;
@@ -29,6 +30,13 @@ public class AuditSessionController : ControllerBase
         var schedule = await _db.AuditSchedules.FindAsync(dto.ScheduleId);
         if (schedule is null)
             return NotFound(new { message = $"Schedule {dto.ScheduleId} tidak ditemukan" });
+
+        if (User.IsInRole("AuditorInternal"))
+        {
+            var currentUserId = Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
+            if (schedule.AuditorId != currentUserId)
+                return Forbid();
+        }
 
         var checklist = await _db.Checklists.FindAsync(dto.ChecklistId);
         if (checklist is null)

@@ -94,21 +94,13 @@ public class AuditPlanController : ControllerBase
         if (plan is null)
             return NotFound(new { message = $"Audit plan dengan ID {id} tidak ditemukan", id = id });
         
-        Guid? currentUserId = null;
-        if (User.IsInRole("AuditorInternal"))
-        {
-            currentUserId = Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
-            if(!plan.Schedules.Any(s => s.AuditorId == currentUserId))
-                return Forbid();
-        }
+      
 
         var CompletedTimes = await _db.AuditSessions
             .Where(s => s.Status == AuditSessionStatus.Completed)
             .ToDictionaryAsync(s => s.ScheduleId, s => s.CompletedAt);
 
-        var schedules = currentUserId.HasValue
-            ? plan.Schedules.Where(s => s.AuditorId == currentUserId).ToList()
-            :plan.Schedules.ToList();
+        
 
         var result = new AuditPlanResponseDto
         {

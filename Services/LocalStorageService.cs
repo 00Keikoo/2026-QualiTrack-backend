@@ -3,11 +3,10 @@ namespace QualiTrack.Services;
 public class LocalStorageService : IStorageService
 {
     private readonly string _uploadPath;
-    private readonly string _baseUrl;
-    public LocalStorageService(IConfiguration config, IWebHostEnvironment env)
+    
+    public LocalStorageService(IWebHostEnvironment env)
     {
         _uploadPath = Path.Combine(env.ContentRootPath, "uploads");
-        _baseUrl = config["App:BaseUrl"] ?? "http://localhost:5144";
         Directory.CreateDirectory(_uploadPath);
     }
 
@@ -24,7 +23,7 @@ public class LocalStorageService : IStorageService
 
     public string GetPresignedUrl(string key, int expiryHours = 24)
     {
-        return $"{_baseUrl}/{key}";
+        return $"/{key}";
     }
 
     public async Task DeleteFileAsync(string key)

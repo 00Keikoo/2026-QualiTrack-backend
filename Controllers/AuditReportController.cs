@@ -13,6 +13,7 @@ namespace QualiTrack.Controllers;
 public class AuditReportController(AppDbContext db) : ControllerBase
 {
     [HttpGet]
+    
     public async Task<IActionResult> GetAll(
         [FromQuery] string? standard,
         [FromQuery] string? department,
