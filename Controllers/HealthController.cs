@@ -3,7 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace QualiTrack.Controllers;
 
 [ApiController]
-[Route("api/[controller]")]
+[Route("api/health")]
 public class HealthController : ControllerBase
 {
     [HttpGet]

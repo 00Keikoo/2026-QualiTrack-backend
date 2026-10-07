@@ -6,7 +6,7 @@ using QualiTrack.Services;
 namespace QualiTrack.Controllers;
 
 [ApiController]
-[Route("api/[controller]")]
+[Route("api/profile")]
 [Authorize]
 public class ProfileController(IKpiService kpiService, IRecentActivityService activityService) : ControllerBase
 {

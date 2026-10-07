@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using System.Security.Claims;
 using QualiTrack.Data;
 using QualiTrack.DTOs;
 using QualiTrack.Filters;
@@ -9,7 +10,7 @@ using QualiTrack.Models;
 namespace QualiTrack.Controllers;
 
 [ApiController]
-[Route("api/[controller]")]
+[Route("api/audit-sessions")]
 [Authorize]
 [ValidateModelAttribute]
 public class AuditSessionController : ControllerBase
@@ -21,7 +22,7 @@ public class AuditSessionController : ControllerBase
         _db = db;
     }
 
-    // POST /api/AuditSession
+    // POST /api/audit-sessions
     [HttpPost]
     [Authorize(Roles = "Admin,QualityManager,AuditorInternal")]
     public async Task<IActionResult> Create([FromBody] CreateAuditSessionDto dto)
@@ -29,6 +30,13 @@ public class AuditSessionController : ControllerBase
         var schedule = await _db.AuditSchedules.FindAsync(dto.ScheduleId);
         if (schedule is null)
             return NotFound(new { message = $"Schedule {dto.ScheduleId} tidak ditemukan" });
+
+        if (User.IsInRole("AuditorInternal"))
+        {
+            var currentUserId = Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
+            if (schedule.AuditorId != currentUserId)
+                return Forbid();
+        }
 
         var checklist = await _db.Checklists.FindAsync(dto.ChecklistId);
         if (checklist is null)
@@ -62,7 +70,7 @@ public class AuditSessionController : ControllerBase
             new { message = "Audit session dimulai", data = ToDto(session) });
     }
 
-    // GET /api/AuditSession/{id}
+    // GET /api/audit-sessions/{id}
     [HttpGet("{id}")]
     [Authorize(Roles = "Admin, QualityManager, AuditorInternal, Auditee")]
     public async Task<IActionResult> GetById(Guid id)
@@ -74,7 +82,7 @@ public class AuditSessionController : ControllerBase
         return Ok(new { data = ToDto(session) });
     }
 
-    // GET /api/AuditSession/by-schedule/{scheduleId}
+    // GET /api/audit-sessions/by-schedule/{scheduleId}
     [HttpGet("by-schedule/{scheduleId}")]
     [Authorize(Roles = "Admin, QualityManager, AuditorInternal, Auditee")]
     public async Task<IActionResult> GetBySchedule(Guid scheduleId)
@@ -88,7 +96,7 @@ public class AuditSessionController : ControllerBase
         return Ok(new { data = ToDto(session) });
     }
 
-    // PATCH /api/AuditSession/{id}/complete
+    // PATCH /api/audit-sessions/{id}/complete
     [HttpPatch("{id}/complete")]
     [Authorize(Roles = "Admin,QualityManager,AuditorInternal")]
     public async Task<IActionResult> Complete(Guid id)
@@ -108,7 +116,7 @@ public class AuditSessionController : ControllerBase
         return Ok(new { message = "Audit session selesai", data = ToDto(session) });
     }
 
-    // PATCH /api/AuditSession/{id}/cancel
+    // PATCH /api/audit-sessions/{id}/cancel
     [HttpPatch("{id}/cancel")]
     [Authorize(Roles = "Admin,QualityManager")]
     public async Task<IActionResult> Cancel(Guid id)
@@ -126,7 +134,7 @@ public class AuditSessionController : ControllerBase
         return Ok(new { message = "Audit session dibatalkan", data = ToDto(session) });
     }
 
-    // POST /api/AuditSession/{sessionId}/summary
+    // POST /api/audit-sessions/{sessionId}/summary
     [HttpPost("{sessionId}/summary")]
     [Authorize(Roles = "Admin, QualityManager, AuditorInternal, Auditee")]
     public async Task<IActionResult> CreateSummary(Guid sessionId, [FromBody] CreateAuditSummaryDto dto)
@@ -163,7 +171,7 @@ public class AuditSessionController : ControllerBase
             new { message = "Summary saved and audit session completed", data = ToSummaryDto(summary) });
     }
 
-    // GET /api/AuditSession/{sessionId}/summary
+    // GET /api/audit-sessions/{sessionId}/summary
     [HttpGet("{sessionId}/summary")]
     [Authorize(Roles = "Admin, QualityManager, AuditorInternal, Auditee")]
     public async Task<IActionResult> GetSummary(Guid sessionId)

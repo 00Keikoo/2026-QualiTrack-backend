@@ -10,7 +10,7 @@ using QualiTrack.Filters;
 namespace QualiTrack.Controllers;
 
 [ApiController]
-[Route("api/[controller]")]
+[Route("api/capas")]
 [Authorize]
 [ValidateModelAttribute]
 public class CapaController(AppDbContext db) : ControllerBase

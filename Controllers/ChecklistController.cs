@@ -5,8 +5,10 @@ using QualiTrack.Data;
 using QualiTrack.DTOs;
 using QualiTrack.Models;
 
+namespace QualiTrack.Controllers;
+
 [ApiController]
-[Route("api/[controller]")]
+[Route("api/checklists")]
 [Authorize]
 public class ChecklistController(AppDbContext db) : ControllerBase
 {

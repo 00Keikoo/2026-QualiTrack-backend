@@ -6,8 +6,10 @@ using QualiTrack.Data;
 using QualiTrack.Models;
 using QualiTrack.Services;
 
+namespace QualiTrack.Controllers;
+
 [ApiController]
-[Route("api/[controller]")]
+[Route("api/uploads")]
 public class UploadController(AppDbContext db, IStorageService storage ) : ControllerBase
 {
     private readonly string[] _allowedTypes = ["image/jpeg", "image/png", "image/jpg", "application/pdf"];
@@ -126,7 +128,7 @@ public class UploadController(AppDbContext db, IStorageService storage ) : Contr
         });
     }
 
-    // POST /api/Upload/audit-response/{responseId}
+    // POST /api/uploads/audit-response/{responseId}
     [HttpPost("audit-response/{responseId}")]
     [Authorize]
     public async Task<IActionResult> UploadForAuditResponse(Guid responseId, IFormFile file)
@@ -164,7 +166,7 @@ public class UploadController(AppDbContext db, IStorageService storage ) : Contr
         });
     }
 
-    // GET /api/Upload/audit-response/{responseId}
+    // GET /api/uploads/audit-response/{responseId}
     [HttpGet("audit-response/{responseId}")]
     [Authorize]
     public async Task<IActionResult> GetAuditResponseFiles(Guid responseId)
