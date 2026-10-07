@@ -20,7 +20,7 @@ public class SpcController(AppDbContext db) : ControllerBase
         IFormFile file,
         [FromForm] double lsl,
         [FromForm] double usl,
-        [FromForm] Double? target,
+        [FromForm] double? target,
         [FromForm] string? unit,
         [FromForm] string productName,
         [FromForm] string? description)

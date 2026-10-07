@@ -6,10 +6,21 @@ using System.Text;
 using QualiTrack.Filters;
 using QualiTrack.Services;
 using System.Text.Json.Serialization;
+using DotNetEnv;
+
+Env.Load();
+Env.TraversePath().Load();
 
 AppContext.SetSwitch("Npgsql.EnableLegacyTimestampBehavior", true);
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Override JWT config dari environment variable
+var jwtKey = Environment.GetEnvironmentVariable("JWT_SECRET");
+if (!string.IsNullOrEmpty(jwtKey))
+{
+    builder.Configuration["Jwt:Key"] = jwtKey;
+}
 
 //DATABASE
 var connectionString = builder.Configuration.GetConnectionString("Supabase")

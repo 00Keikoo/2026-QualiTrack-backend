@@ -96,7 +96,7 @@ public class AuditPlanController : ControllerBase
         
       
 
-        var CompletedTimes = await _db.AuditSessions
+        var completedTimes = await _db.AuditSessions
             .Where(s => s.Status == AuditSessionStatus.Completed)
             .ToDictionaryAsync(s => s.ScheduleId, s => s.CompletedAt);
 
@@ -122,8 +122,8 @@ public class AuditPlanController : ControllerBase
                     : s.AuditorName,  // Fallback ke AuditorName jika join gagal
                 ScheduledDate = s.ScheduledDate,
                 Department = s.Department,
-                IsFinished = CompletedTimes.ContainsKey(s.Id),
-                CompletedAt = CompletedTimes.GetValueOrDefault(s.Id)
+                IsFinished = completedTimes.ContainsKey(s.Id),
+                CompletedAt = completedTimes.GetValueOrDefault(s.Id)
             }).ToList()
         };
 

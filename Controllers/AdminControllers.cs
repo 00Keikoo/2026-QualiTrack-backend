@@ -19,10 +19,8 @@ public class AdminController(AppDbContext db) : ControllerBase
 
     private static readonly string[] ValidStatuses = ["Active", "Inactive"];
 
-    // ============================================================
     // GET /api/admin/users
     // Daftar semua user dengan filter dan search
-    // ============================================================
     [HttpGet("users")]
     public async Task<IActionResult> GetUsers(
         [FromQuery] string? search,
@@ -65,10 +63,8 @@ public class AdminController(AppDbContext db) : ControllerBase
         });
     }
 
-    // ============================================================
     // GET /api/admin/users/{id}
     // Detail satu user
-    // ============================================================
     [HttpGet("users/{id}")]
     public async Task<IActionResult> GetUserById(Guid id)
     {
@@ -92,10 +88,8 @@ public class AdminController(AppDbContext db) : ControllerBase
         });
     }
 
-    // ============================================================
     // PUT /api/admin/users/{id}
     // Update nama dan email user
-    // ============================================================
     [HttpPut("users/{id}")]
     public async Task<IActionResult> UpdateUser(Guid id, [FromBody] UpdateUserRequest req)
     {
@@ -118,10 +112,8 @@ public class AdminController(AppDbContext db) : ControllerBase
         return Ok(new { message = "Data user berhasil diupdate" });
     }
 
-    // ============================================================
     // PATCH /api/admin/users/{id}/role
     // Update role user
-    // ============================================================
     [HttpPatch("users/{id}/role")]
     public async Task<IActionResult> UpdateUserRole(Guid id, [FromBody] UpdateUserRoleRequest req)
     {
@@ -153,10 +145,8 @@ public class AdminController(AppDbContext db) : ControllerBase
         return Ok(new { message = "Role user berhasil diupdate" });
     }
 
-    // ============================================================
     // PATCH /api/admin/users/{id}/status
     // Aktifkan/nonaktifkan user
-    // ============================================================
     [HttpPatch("users/{id}/status")]
     public async Task<IActionResult> UpdateUserStatus(Guid id, [FromBody] UpdateUserStatusRequest req)
     {
