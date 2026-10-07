@@ -26,6 +26,24 @@ public class AuthController(AppDbContext db, IConfiguration config, IEmailServic
     private const int OtpMin = 1000;
     private const int OtpMax = 9999;
 
+    private async Task GenerateAndSendOtpAsync(User user, string email)
+    {
+        var otp = GenerateSecureOtp();
+        user.OtpCode = BCrypt.Net.BCrypt.HashPassword(otp);
+        user.OtpExpiry = DateTime.UtcNow.AddMinutes(OtpExpiryMinutes);
+        await db.SaveChangesAsync();
+        await emailService.SendOtpAsync(email, otp);
+    }
+
+    private async Task GenerateAndSendRegistrationOtpAsync(User user, string email)
+    {
+        var otp = GenerateSecureOtp();
+        user.OtpCode = BCrypt.Net.BCrypt.HashPassword(otp);
+        user.OtpExpiry = DateTime.UtcNow.AddMinutes(OtpExpiryMinutes);
+        await db.SaveChangesAsync();
+        await emailService.SendRegistrationOtpAsync(email, otp);
+    }
+
     [HttpPost("register")]
     public async Task<IActionResult> Register(RegisterRequest req)
     {
@@ -51,11 +69,7 @@ public class AuthController(AppDbContext db, IConfiguration config, IEmailServic
             existingUser.Role = req.Role;
             existingUser.PasswordHash = BCrypt.Net.BCrypt.HashPassword(req.Password);
 
-            var newOtp = GenerateSecureOtp();
-            existingUser.OtpCode = BCrypt.Net.BCrypt.HashPassword(newOtp);
-            existingUser.OtpExpiry = DateTime.UtcNow.AddMinutes(OtpExpiryMinutes);
-            await db.SaveChangesAsync();
-            await emailService.SendRegistrationOtpAsync(existingUser.Email, newOtp);
+            await GenerateAndSendRegistrationOtpAsync(existingUser, existingUser.Email);
 
             return Ok(new
             {
@@ -63,9 +77,6 @@ public class AuthController(AppDbContext db, IConfiguration config, IEmailServic
                 email = existingUser.Email
             });
         }
-
-
-        var otp = GenerateSecureOtp();
 
         var user = new User
         {
@@ -76,15 +87,15 @@ public class AuthController(AppDbContext db, IConfiguration config, IEmailServic
             Role = req.Role,
             Status = "Pending",
             EmailVerified = false,
-            OtpCode = BCrypt.Net.BCrypt.HashPassword(otp),
-            OtpExpiry = DateTime.UtcNow.AddMinutes(OtpExpiryMinutes),
+            OtpCode = null,
+            OtpExpiry = null,
             CreatedAt = DateTime.UtcNow
         };
 
         db.Users.Add(user);
         await db.SaveChangesAsync();
 
-        await emailService.SendRegistrationOtpAsync(user.Email, otp);
+        await GenerateAndSendRegistrationOtpAsync(user, user.Email);
 
         return Ok(new
         {
@@ -131,12 +142,7 @@ public class AuthController(AppDbContext db, IConfiguration config, IEmailServic
         if (user.EmailVerified)
             return BadRequest(new { message = "Email sudah diverifikasi" });
 
-        var otp = GenerateSecureOtp();
-        user.OtpCode = BCrypt.Net.BCrypt.HashPassword(otp);
-        user.OtpExpiry = DateTime.UtcNow.AddMinutes(OtpExpiryMinutes);
-        await db.SaveChangesAsync();
-
-        await emailService.SendRegistrationOtpAsync(user.Email, otp);
+        await GenerateAndSendOtpAsync(user, user.Email);
 
         return Ok(new { message = "Kode OTP baru telah dikirim ke email kamu" });
 
@@ -150,7 +156,6 @@ public class AuthController(AppDbContext db, IConfiguration config, IEmailServic
         if (user is null || !BCrypt.Net.BCrypt.Verify(req.Password, user.PasswordHash))
             return Unauthorized(new { message = "Email atau password salah" });
 
-        // TODO akhir Sprint 2: aktifkan kembali setelah email service siap
         if (!user.EmailVerified)
             return Unauthorized(new { message = "Email belum diverifikasi. Cek inbox email kamu." });
 
@@ -197,12 +202,7 @@ public class AuthController(AppDbContext db, IConfiguration config, IEmailServic
         if (user is null)
             return NotFound(new { message = "Email tidak ditemukan" });
 
-        var otp = GenerateSecureOtp();
-        user.OtpCode = BCrypt.Net.BCrypt.HashPassword(otp);
-        user.OtpExpiry = DateTime.UtcNow.AddMinutes(OtpExpiryMinutes);
-        await db.SaveChangesAsync();
-
-        await emailService.SendOtpAsync(user.Email, otp);
+        await GenerateAndSendOtpAsync(user, user.Email);
 
         return Ok(new { message = "Kode OTP telah dikirim ke email kamu" });
     }
@@ -272,13 +272,7 @@ public class AuthController(AppDbContext db, IConfiguration config, IEmailServic
         var emailTaken = await db.Users.AnyAsync(u => u.Email == req.NewEmail && u.Id != userId);
         if (emailTaken) return BadRequest(new { message = "Email sudah digunakan oleh akun lain" });
 
-        var otp = GenerateSecureOtp();
-        user.PendingEmail = req.NewEmail;
-        user.OtpCode = BCrypt.Net.BCrypt.HashPassword(otp);
-        user.OtpExpiry = DateTime.UtcNow.AddMinutes(OtpExpiryMinutes);
-        await db.SaveChangesAsync();
-
-        await emailService.SendOtpAsync(req.NewEmail, otp);
+        await GenerateAndSendOtpAsync(user, user.Email);
 
         return Ok(new { message = $"OTP telah dikirim ke {req.NewEmail}. Berlaku 5 menit." });
     }
@@ -342,6 +336,6 @@ public class AuthController(AppDbContext db, IConfiguration config, IEmailServic
         var bytes = new byte[OtpLength];
         rng.GetBytes(bytes);
         var value = BitConverter.ToUInt32(bytes, 0);
-        return (value % 9000 + 1000).ToString();
+        return (value % (OtpMax - OtpMin + 1)).ToString();
     }
 }

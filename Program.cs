@@ -22,6 +22,13 @@ if (!string.IsNullOrEmpty(jwtKey))
     builder.Configuration["Jwt:Key"] = jwtKey;
 }
 
+// Override Email config dari environment variable
+var oauthPw = Environment.GetEnvironmentVariable("OAUTH_PW");
+if (!string.IsNullOrEmpty(oauthPw))
+{
+    builder.Configuration["Email:Password"] = oauthPw;
+}
+
 //DATABASE
 var connectionString = builder.Configuration.GetConnectionString("Supabase")
     ?? throw new InvalidOperationException("Connection string 'Supabase' not found.");
