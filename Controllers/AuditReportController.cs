@@ -8,7 +8,7 @@ using QualiTrack.Models;
 namespace QualiTrack.Controllers;
 
 [ApiController]
-[Route("api/[controller]")]
+[Route("api/audit-reports")]
 [Authorize]
 public class AuditReportController(AppDbContext db) : ControllerBase
 {

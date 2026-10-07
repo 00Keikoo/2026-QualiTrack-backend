@@ -10,7 +10,7 @@ using QualiTrack.Models;
 namespace QualiTrack.Controllers;
 
 [ApiController]
-[Route("api/[controller]")]
+[Route("api/audit-responses")]
 [Authorize]
 [ValidateModelAttribute]
 public class AuditResponseController : ControllerBase
@@ -22,7 +22,7 @@ public class AuditResponseController : ControllerBase
         _db = db;
     }
 
-    // POST /api/AuditResponse/batch
+    // POST /api/audit-responses/batch
     [HttpPost("batch")]
     [Authorize(Roles = "Admin,QualityManager,AuditorInternal")]
     public async Task<IActionResult> SaveBatch([FromBody] BatchAuditResponseDto dto)
@@ -67,7 +67,7 @@ public class AuditResponseController : ControllerBase
         });
     }
 
-    // POST /api/AuditResponse/progress
+    // POST /api/audit-response/sprogress
 // Simpan satu jawaban — dipanggil setiap user jawab satu item
     [HttpPost("progress")]
     [Authorize(Roles = "Admin,QualityManager,AuditorInternal")]
@@ -122,7 +122,7 @@ public class AuditResponseController : ControllerBase
         return Ok(new { message = "Progress tersimpan" });
     }
 
-    // GET /api/AuditResponse/by-session/{sessionId}
+    // GET /api/audit-responses/by-session/{sessionId}
     [HttpGet("by-session/{sessionId:guid}")]
     [Authorize(Roles = "Admin, QualityManager, AuditorInternal, Auditee")]
     public async Task<IActionResult> GetBySession(Guid sessionId)

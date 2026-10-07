@@ -15,7 +15,7 @@ using QualiTrack.Filters;
 namespace QualiTrack.Controllers;
 
 [ApiController]
-[Route("api/[controller]")]
+[Route("api/auth")]
 [ValidateModelAttribute]
 public class AuthController(AppDbContext db, IConfiguration config, IEmailService emailService) : ControllerBase
 {
@@ -86,7 +86,6 @@ public class AuthController(AppDbContext db, IConfiguration config, IEmailServic
         });
     }
 
-    // TODO akhir Sprint 2: aktifkan kembali setelah email service siap
     [HttpPost("verify-email")]
     public async Task<IActionResult> VerifyEmail([FromBody] VerifyEmailRequest req)
     {

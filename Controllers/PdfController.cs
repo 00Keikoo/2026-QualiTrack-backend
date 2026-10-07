@@ -7,7 +7,7 @@ using QualiTrack.Services;
 namespace QualiTrack.Controllers;
 
 [ApiController]
-[Route("api/[controller]")]
+[Route("api/pdf")]
 [Authorize]
 public class PdfController(AppDbContext db, PdfReportService pdfService, IStorageService storage) : ControllerBase
 {

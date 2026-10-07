@@ -6,7 +6,7 @@ using QualiTrack.Services;
 namespace QualiTrack.Controllers;
 
 [ApiController]
-[Route("api/[controller]")]
+[Route("api/quality-scores")]
 [Authorize]
 
 public class QualityScoreController(IQualityScoreService qualityScoreService) : ControllerBase

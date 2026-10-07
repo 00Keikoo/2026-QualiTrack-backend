@@ -9,7 +9,7 @@ using QualiTrack.Models;
 namespace QualiTrack.Controllers;
 
 [ApiController]
-[Route("api/[controller]")]
+[Route("api/findings")]
 [Authorize]
 [ValidateModelAttribute]
 public class FindingController(AppDbContext db) : ControllerBase

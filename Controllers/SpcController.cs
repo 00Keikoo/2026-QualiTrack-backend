@@ -11,7 +11,7 @@ using System.Security.Claims;
 namespace QualiTrack.Controllers;
 
 [ApiController]
-[Route("api/[controller]")]
+[Route("api/spc")]
 [Authorize]
 public class SpcController(AppDbContext db) : ControllerBase
 {
@@ -132,7 +132,7 @@ public class SpcController(AppDbContext db) : ControllerBase
         });
     }
 
-    //GET /api/Spc/history?period=3m&productName=xxx
+    //GET /api/spc/history?period=3m&productName=xxx
     [HttpGet("history")]
     public async Task<IActionResult> GetHistory(
         [FromQuery] string period = "3m",
@@ -184,7 +184,7 @@ public class SpcController(AppDbContext db) : ControllerBase
         });
     }
 
-    //GET /api/Spc/{id} — detail satu analisis
+    //GET /api/spc/{id} — detail satu analisis
     [HttpGet("{id}")]
     public async Task<IActionResult> GetById(Guid id)
     {

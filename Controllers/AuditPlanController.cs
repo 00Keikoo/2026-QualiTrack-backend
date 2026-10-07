@@ -11,7 +11,7 @@ using QualiTrack.Models;
 namespace QualiTrack.Controllers;
 
 [ApiController]
-[Route("api/[controller]")]
+[Route("api/audit-plans")]
 [Authorize]
 [ValidateModelAttribute]
 public class AuditPlanController : ControllerBase
