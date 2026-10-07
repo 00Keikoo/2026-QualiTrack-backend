@@ -19,11 +19,6 @@ builder.Services.AddDbContext<AppDbContext>(opt =>
     opt.UseNpgsql(connectionString));
 
 // JWT AUTH
-var jwtSection = builder.Configuration.GetSection("Jwt");
-var jwtKey = jwtSection["Key"]!;
-var jwtIssuer = jwtSection["Issuer"]!;
-var jwtAudience = jwtSection["Audience"]!;
-
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(opt =>
     {
@@ -95,7 +90,6 @@ builder.Services.AddControllers(options =>
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
-AppContext.SetSwitch("Npgsql.EnableLegacyTimestampBehavior", true);
 var app = builder.Build();
 
 // Seed data checklist template

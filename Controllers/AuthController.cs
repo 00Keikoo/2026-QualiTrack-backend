@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
+using System.Security.Cryptography;
 using System.Text;
 using QualiTrack.Data;
 using QualiTrack.DTOs;
@@ -43,7 +44,7 @@ public class AuthController(AppDbContext db, IConfiguration config, IEmailServic
             existingUser.Role = req.Role;
             existingUser.PasswordHash = BCrypt.Net.BCrypt.HashPassword(req.Password);
 
-            var newOtp = new Random().Next(1000, 9999).ToString();
+            var newOtp = GenerateSecureOtp();
             existingUser.OtpCode = BCrypt.Net.BCrypt.HashPassword(newOtp);
             existingUser.OtpExpiry = DateTime.UtcNow.AddMinutes(5);
             await db.SaveChangesAsync();
@@ -57,7 +58,7 @@ public class AuthController(AppDbContext db, IConfiguration config, IEmailServic
         }
         
 
-        var otp = new Random().Next(1000, 9999).ToString();
+        var otp = GenerateSecureOtp();
 
         var user = new User
         {
@@ -124,7 +125,7 @@ public class AuthController(AppDbContext db, IConfiguration config, IEmailServic
         if (user.EmailVerified)
             return BadRequest(new { message = "Email sudah diverifikasi" });
 
-        var otp = new Random().Next(1000, 9999).ToString();
+        var otp = GenerateSecureOtp();
         user.OtpCode = BCrypt.Net.BCrypt.HashPassword(otp);
         user.OtpExpiry = DateTime.UtcNow.AddMinutes(5);
         await db.SaveChangesAsync();
@@ -242,7 +243,7 @@ public class AuthController(AppDbContext db, IConfiguration config, IEmailServic
         if (user is null)
             return NotFound(new { message = "Email tidak ditemukan" });
 
-        var otp = new Random().Next(1000, 9999).ToString();
+        var otp = GenerateSecureOtp();
         user.OtpCode = BCrypt.Net.BCrypt.HashPassword(otp);
         user.OtpExpiry = DateTime.UtcNow.AddMinutes(5);
         await db.SaveChangesAsync();
@@ -329,7 +330,7 @@ public class AuthController(AppDbContext db, IConfiguration config, IEmailServic
         var emailTaken = await db.Users.AnyAsync(u => u.Email == req.NewEmail && u.Id != userId);
         if (emailTaken) return BadRequest(new { message = "Email sudah digunakan oleh akun lain" });
 
-        var otp = new Random().Next(1000, 9999).ToString();
+        var otp = GenerateSecureOtp();
         user.PendingEmail = req.NewEmail;
         user.OtpCode = BCrypt.Net.BCrypt.HashPassword(otp);
         user.OtpExpiry = DateTime.UtcNow.AddMinutes(5);
@@ -391,6 +392,15 @@ public class AuthController(AppDbContext db, IConfiguration config, IEmailServic
         );
 
         return new JwtSecurityTokenHandler().WriteToken(token);
+    }
+
+    private static string GenerateSecureOtp()
+    {
+        using var rng = System.Security.Cryptography.RandomNumberGenerator.Create();
+        var bytes = new byte[4];
+        rng.GetBytes(bytes);
+        var value = BitConverter.ToUInt32(bytes, 0);
+        return (value % 9000 + 1000).ToString();
     }
 
     [HttpPost("upload-profile-photo")]

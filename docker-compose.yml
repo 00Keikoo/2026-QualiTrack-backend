@@ -45,6 +45,7 @@ services:
       - Jwt__Key=${JWT_SECRET}
       - Jwt__Issuer=QualiTrack
       - Jwt__Audience=QualiTrack
+      - Email__Password=${OAUTH_PW} 
       - S3__Endpoint=http://minio:9000
       - S3__BucketName=qualitrack
       - S3__AccessKey=minioadmin
