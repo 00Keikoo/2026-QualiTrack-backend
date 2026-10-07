@@ -131,6 +131,44 @@ app.UseStaticFiles(new StaticFileOptions
 
 app.UseStaticFiles();
 app.UseCors("AllowFrontend");
+
+// Stopwatch middleware
+app.Use(async (context, next) =>
+{
+    var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+    await next();
+    stopwatch.Stop();
+
+    var elapsed = stopwatch.ElapsedMilliseconds;
+    var path = context.Request.Path;
+    var method = context.Request.Method;
+    var statusCode = context.Response.StatusCode;
+
+    Console.WriteLine($"[PERF] {method} {path} → {statusCode} | {elapsed}ms");
+
+    // Warning kalau lebih dari 500ms
+    if (elapsed > 500)
+        Console.WriteLine($"[SLOW] ⚠️ {method} {path} lambat: {elapsed}ms");
+});
+
+// Size middleware
+app.Use(async (context, next) =>
+{
+    var originalBody = context.Response.Body;
+    using var memStream = new MemoryStream();
+    context.Response.Body = memStream;
+    await next();
+    var responseSize = memStream.Length;
+    memStream.Position = 0;
+    await memStream.CopyToAsync(originalBody);
+    context.Response.Body = originalBody;
+    var path = context.Request.Path;
+    var sizeKb = responseSize / 1024.0;
+    Console.WriteLine($"[SIZE] {path} → {sizeKb:F2} KB");
+    if (responseSize > 1_000_000)
+        Console.WriteLine($"[BIG] ⚠️ {path} payload besar: {sizeKb:F2} KB");
+});
+
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
