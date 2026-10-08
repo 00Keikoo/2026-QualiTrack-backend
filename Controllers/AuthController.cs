@@ -11,6 +11,7 @@ using QualiTrack.DTOs;
 using QualiTrack.Models;
 using QualiTrack.Services;
 using QualiTrack.Filters;
+using QualiTrack.Constants;
 
 namespace QualiTrack.Controllers;
 
@@ -59,10 +60,10 @@ public class AuthController(AppDbContext db, IConfiguration config, IEmailServic
             return BadRequest(new { message = "Password minimal 6 karakter" });
 
         var existingUser = await db.Users.FirstOrDefaultAsync(u => u.Email == req.Email);
-        if(existingUser != null)
+        if (existingUser != null)
         {
-            if(existingUser.EmailVerified)
-                return BadRequest(new { message = "Email sudah terdaftar"});
+            if (existingUser.EmailVerified)
+                return BadRequest(new { message = "Email sudah terdaftar" });
 
             // Daftar ulang sebelum verifikasi: pakai data terbaru dari form (termasuk role)
             existingUser.FullName = req.FullName;
@@ -85,7 +86,7 @@ public class AuthController(AppDbContext db, IConfiguration config, IEmailServic
             Email = req.Email,
             PasswordHash = BCrypt.Net.BCrypt.HashPassword(req.Password),
             Role = req.Role,
-            Status = "Pending",
+            Status = UserStatus.Pending,
             EmailVerified = false,
             OtpCode = null,
             OtpExpiry = null,
@@ -124,7 +125,7 @@ public class AuthController(AppDbContext db, IConfiguration config, IEmailServic
             return BadRequest(new { message = "OTP tidak valid" });
 
         user.EmailVerified = true;
-        user.Status = "Active";
+        user.Status = UserStatus.Active;
         user.OtpCode = null;
         user.OtpExpiry = null;
         await db.SaveChangesAsync();

@@ -1,4 +1,5 @@
-using System.ComponentModel.DataAnnotations;  
+using System.ComponentModel.DataAnnotations;
+using QualiTrack.Constants;
 
 namespace QualiTrack.Models;
 
@@ -19,7 +20,7 @@ public class User
     [Required(ErrorMessage = "Role wajib diisi")]
     public string Role { get; set; } = "QualityManager";
     
-    public string Status { get; set; } = "Active";
+    public string Status { get; set; } = UserStatus.Active;
 
     public bool EmailVerified { get; set; } = false;
 	

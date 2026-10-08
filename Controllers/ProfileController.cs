@@ -16,15 +16,18 @@ public class ProfileController : ControllerBase
     private readonly IKpiService _kpiService;
     private readonly IRecentActivityService _activityService;
     private readonly AppDbContext _db;
+    private readonly IStorageService _storageService;
 
     public ProfileController(
         IKpiService kpiService,
         IRecentActivityService activityService,
-        AppDbContext db)
+        AppDbContext db,
+        IStorageService storageService)
     {
         _kpiService = kpiService;
         _activityService = activityService;
         _db = db;
+        _storageService = storageService;
     }
 
     [HttpGet]
@@ -112,23 +115,14 @@ public class ProfileController : ControllerBase
 
         if (!string.IsNullOrEmpty(user.ProfilePhotoUrl))
         {
-            var oldPath = Path.Combine("uploads", "profiles", Path.GetFileName(user.ProfilePhotoUrl));
-            if (System.IO.File.Exists(oldPath))
-                System.IO.File.Delete(oldPath);
+            await _storageService.DeleteFileAsync(user.ProfilePhotoUrl);
         }
 
-        var uploadDir = Path.Combine("uploads", "profiles");
-        Directory.CreateDirectory(uploadDir);
-        var fileName = $"{userId}_{Guid.NewGuid()}{Path.GetExtension(file.FileName)}";
-        var filePath = Path.Combine(uploadDir, fileName);
-
-        using (var stream = new FileStream(filePath, FileMode.Create))
-            await file.CopyToAsync(stream);
-
-        user.ProfilePhotoUrl = $"/uploads/profiles/{fileName}";
+        var photoUrl = await _storageService.UploadFileAsync(file);
+        user.ProfilePhotoUrl = photoUrl;
         await _db.SaveChangesAsync();
 
-        return Ok(new { message = "Foto profil berhasil di upload", url = user.ProfilePhotoUrl });
+        return Ok(new { message = "Foto Profil berhasil di upload", url = user.ProfilePhotoUrl });
     }
 
     [HttpDelete("photo")]
@@ -142,11 +136,7 @@ public class ProfileController : ControllerBase
         if (string.IsNullOrEmpty(user.ProfilePhotoUrl))
             return BadRequest(new { message = "Tidak ada foto profil yang bisa dihapus" });
 
-        var filePath = Path.Combine("uploads", "profiles", Path.GetFileName(user.ProfilePhotoUrl));
-        if (!System.IO.File.Exists(filePath))
-            return NotFound(new { message = "File foto profil tidak ditemukan " });
-
-        System.IO.File.Delete(filePath);
+        await _storageService.DeleteFileAsync(user.ProfilePhotoUrl);
 
         user.ProfilePhotoUrl = null;
         await _db.SaveChangesAsync();

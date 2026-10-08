@@ -70,7 +70,7 @@ public class ChecklistController(AppDbContext db) : ControllerBase
     }
 
     [HttpPost]
-    [Authorize(Roles = "Admin, QualityManager")]
+    [Authorize(Roles = "Admin,QualityManager")]
     public async Task<IActionResult> Create(Checklist checklist)
     {
         checklist.Id = Guid.NewGuid();

@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using QualiTrack.Constants;
 using QualiTrack.Data;
 using QualiTrack.Models;
 
@@ -73,7 +74,7 @@ public class UserController : ControllerBase
     public async Task<IActionResult> GetPicCandidates()
     {
         var pics = await _db.Users
-            .Where(u => u.EmailVerified == true && u.Status == "Active" && u.Role == "Auditee")
+            .Where(u => u.EmailVerified == true && u.Status == UserStatus.Active && u.Role == "Auditee")
             .Select(u => new { u.Id, u.FullName })
             .ToListAsync();
 

@@ -17,14 +17,14 @@ namespace QualiTrack.Controllers;
 public class AuditPlanController : ControllerBase
 {
     private readonly AppDbContext _db;
-    
+
     public AuditPlanController(AppDbContext db)
     {
         _db = db;
     }
 
     [HttpGet]
-    [Authorize(Roles = "Admin,QualityManager,AuditorInternal, Auditee")]
+    [Authorize(Roles = "Admin,QualityManager,AuditorInternal,Auditee")]
     public async Task<IActionResult> GetAll()
     {
         var plansQuery = _db.AuditPlans
@@ -32,12 +32,12 @@ public class AuditPlanController : ControllerBase
                 .ThenInclude(s => s.Auditor)
             .OrderByDescending(a => a.CreatedAt)
             .AsQueryable();
-        
+
         Guid? currentUserId = null;
         if (User.IsInRole("AuditorInternal"))
         {
             currentUserId = Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
-            plansQuery = plansQuery.Where(p => p.Schedules.Any(s => s.AuditorId ==currentUserId));
+            plansQuery = plansQuery.Where(p => p.Schedules.Any(s => s.AuditorId == currentUserId));
         }
 
         var plans = await plansQuery.ToListAsync();
@@ -78,7 +78,7 @@ public class AuditPlanController : ControllerBase
                 }).ToList()
             };
         });
-        
+
         return Ok(new { message = "Data audit plan berhasil diambil", total = plans.Count, data = result });
     }
 
@@ -90,17 +90,17 @@ public class AuditPlanController : ControllerBase
             .Include(a => a.Schedules)
                 .ThenInclude(s => s.Auditor)
             .FirstOrDefaultAsync(a => a.Id == id);
-        
+
         if (plan is null)
             return NotFound(new { message = $"Audit plan dengan ID {id} tidak ditemukan", id = id });
-        
-      
+
+
 
         var completedTimes = await _db.AuditSessions
             .Where(s => s.Status == AuditSessionStatus.Completed)
             .ToDictionaryAsync(s => s.ScheduleId, s => s.CompletedAt);
 
-        
+
 
         var result = new AuditPlanResponseDto
         {
@@ -175,8 +175,8 @@ public class AuditPlanController : ControllerBase
         _db.AuditPlans.Add(plan);
         await _db.SaveChangesAsync();
 
-        return CreatedAtAction(nameof(GetById), new { id = plan.Id }, 
-            new { message = "Audit plan berhasil dibuat", data = new { plan.Id, plan.Title} });
+        return CreatedAtAction(nameof(GetById), new { id = plan.Id },
+            new { message = "Audit plan berhasil dibuat", data = new { plan.Id, plan.Title } });
     }
 
     [HttpPut("{id}")]
@@ -186,10 +186,10 @@ public class AuditPlanController : ControllerBase
         var plan = await _db.AuditPlans
             .Include(a => a.Schedules)
             .FirstOrDefaultAsync(a => a.Id == id);
-        
+
         if (plan is null)
             return NotFound(new { message = $"Audit plan dengan ID {id} tidak ditemukan", id = id });
-        
+
         plan.Title = updatedPlanDto.Title;
         plan.Year = updatedPlanDto.Year;
         plan.Standard = updatedPlanDto.Standard;
@@ -199,87 +199,23 @@ public class AuditPlanController : ControllerBase
         if (updatedPlanDto.Schedules is not null)
         {
             var scheduleIds = plan.Schedules.Select(s => s.Id).ToList();
-            
-            if (scheduleIds.Any())
-            {
-                var sessions = await _db.AuditSessions
-                .Where(s => scheduleIds.Contains(s.ScheduleId))
-                .ToListAsync();
-
-                var sessionIds = sessions.Select(s => s.Id).ToList();
-
-                if (sessionIds.Any())
-                {
-                     var finding = await _db.Findings
-                        .Where(f => f.SessionId.HasValue && sessionIds.Contains(f.SessionId.Value))
-                        .ToListAsync();
-                    _db.Findings.RemoveRange(finding);
-
-                    var responses = await _db.AuditResponses
-                        .Where(r => sessionIds.Contains (r.SessionId))
-                        .ToListAsync();
-
-                    _db.AuditResponses.RemoveRange(responses);
-
-                    _db.AuditSessions.RemoveRange(sessions);
-                }
-            }
-            
+            await DeleteRelatedSessionAsync(scheduleIds);
             _db.AuditSchedules.RemoveRange(plan.Schedules);
-            var newSchedules = new List<AuditSchedule>();
-            foreach (var scheduleDto in updatedPlanDto.Schedules)
-            {
-                var auditor = await _db.Users
-                    .FirstOrDefaultAsync(u => u.FullName == scheduleDto.AuditorName);
-                if (auditor is null)
-                {
-                    return BadRequest(new { message = $"Auditor dengan nama {scheduleDto.AuditorName} tidak ditemukan" });
-                }
 
-                newSchedules.Add(new AuditSchedule
-                {
-                    Id = Guid.NewGuid(),
-                    ClauseRef = scheduleDto.ClauseRef,
-                    AuditorId = auditor.Id,
-                    AuditorName = auditor.FullName,
-                    ScheduledDate = DateTime.SpecifyKind(scheduleDto.ScheduledDate!.Value, DateTimeKind.Utc),
-                    Department = scheduleDto.Department,
-                    AuditPlanId = plan.Id
-                });
+            try
+            {
+                var newSchedules = await CreateSchedulesFromDtoAsync(updatedPlanDto.Schedules, plan.Id);
+                _db.AuditSchedules.AddRange(newSchedules);
             }
-            _db.AuditSchedules.AddRange(newSchedules);
-        }
-        
-        await _db.SaveChangesAsync();
-
-        var completedTimes = await _db.AuditSessions
-            .Where(s => s.Status == AuditSessionStatus.Completed)
-            .ToDictionaryAsync(s => s.ScheduleId, s => s.CompletedAt);
-
-        var result = new AuditPlanResponseDto
-        {
-            Id = plan.Id,
-            Title = plan.Title,
-            Year = plan.Year,
-            Standard = plan.Standard,
-            CreatedAt = plan.CreatedAt,
-            Description = plan.Description,
-            Priority = plan.Priority,
-            TotalSchedules = plan.Schedules.Count,
-            Schedules = plan.Schedules.Select(s => new ScheduleResponseDto
+            catch (InvalidOperationException ex)
             {
-                Id = s.Id,
-                ClauseRef = s.ClauseRef,
-                AuditorId = s.AuditorId ?? Guid.Empty,
-                AuditorName = s.AuditorName,
-                ScheduledDate = s.ScheduledDate,
-                Department = s.Department,
-                IsFinished = completedTimes.ContainsKey(s.Id),
-                CompletedAt = completedTimes.GetValueOrDefault(s.Id)
-            }).ToList()
-        };
-        
-        return Ok(new { message = "Audit plan berhasil diupdate", data = result });
+                return BadRequest(new { message = ex.Message });
+            }
+        }
+
+        await _db.SaveChangesAsync();
+        var result = await BuildResponseDtoAsync(plan);
+        return Ok(new { message = "Audit plan berhasil di update", data = result });
     }
 
     [HttpDelete("{id}")]
@@ -289,10 +225,10 @@ public class AuditPlanController : ControllerBase
         var plan = await _db.AuditPlans
             .Include(a => a.Schedules)
             .FirstOrDefaultAsync(a => a.Id == id);
-        
+
         if (plan is null)
             return NotFound(new { message = $"Audit plan dengan ID {id} tidak ditemukan", id = id });
-        
+
         var scheduleIds = plan.Schedules.Select(s => s.Id).ToList();
 
         if (scheduleIds.Any())
@@ -322,7 +258,95 @@ public class AuditPlanController : ControllerBase
         _db.AuditSchedules.RemoveRange(plan.Schedules);
         _db.AuditPlans.Remove(plan);
         await _db.SaveChangesAsync();
-        
+
         return Ok(new { message = "Audit plan berhasil dihapus", id = id });
+    }
+
+    private async Task<List<AuditSchedule>> CreateSchedulesFromDtoAsync(List<CreateScheduleDto> scheduleDtos, Guid planId)
+    {
+        var newSchedules = new List<AuditSchedule>();
+
+        foreach (var scheduleDto in scheduleDtos)
+        {
+            var auditor = await _db.Users
+                .FirstOrDefaultAsync(u => u.FullName == scheduleDto.AuditorName);
+
+            if (auditor is null)
+            {
+                throw new InvalidOperationException(
+                    $"Auditor dengan nama {scheduleDto.AuditorName} tidak ditemukan"
+                );
+            }
+
+            newSchedules.Add(new AuditSchedule
+            {
+                Id = Guid.NewGuid(),
+                ClauseRef = scheduleDto.ClauseRef,
+                AuditorId = auditor.Id,
+                AuditorName = auditor.FullName,
+                ScheduledDate = DateTime.SpecifyKind(
+                    scheduleDto.ScheduledDate!.Value,
+                    DateTimeKind.Utc
+                ),
+                Department = scheduleDto.Department,
+                AuditPlanId = planId
+            });
+        }
+
+        return newSchedules;
+    }
+
+    private async Task<AuditPlanResponseDto> BuildResponseDtoAsync(AuditPlan plan)
+    {
+        var completedTimes = await _db.AuditSessions
+            .Where(s => s.Status == AuditSessionStatus.Completed)
+            .ToDictionaryAsync(s => s.ScheduleId, s => s.CompletedAt);
+
+        return new AuditPlanResponseDto
+        {
+            Id = plan.Id,
+            Title = plan.Title,
+            Year = plan.Year,
+            Standard = plan.Standard,
+            CreatedAt = plan.CreatedAt,
+            Description = plan.Description,
+            Priority = plan.Priority,
+            TotalSchedules = plan.Schedules.Count,
+            Schedules = plan.Schedules.Select(s => new ScheduleResponseDto
+            {
+                Id = s.Id,
+                ClauseRef = s.ClauseRef,
+                AuditorId = s.AuditorId ?? Guid.Empty,
+                AuditorName = s.AuditorName,
+                ScheduledDate = s.ScheduledDate,
+                Department = s.Department,
+                IsFinished = completedTimes.ContainsKey(s.Id),
+                CompletedAt = completedTimes.GetValueOrDefault(s.Id)
+            }).ToList()
+        };
+    }
+
+    private async Task DeleteRelatedSessionAsync(List<Guid> scheduleIds)
+    {
+        var sessions = await _db.AuditSessions
+            .Where(s => scheduleIds.Contains(s.ScheduleId))
+            .ToListAsync();
+
+        var sessionIds = sessions.Select(s => s.Id).ToList();
+
+        if (sessionIds.Any())
+        {
+            var findings = await _db.Findings
+                .Where(f => f.SessionId.HasValue && sessionIds.Contains(f.SessionId.Value))
+                .ToListAsync();
+            _db.Findings.RemoveRange(findings);
+
+            var responses = await _db.AuditResponses
+                .Where(r => sessionIds.Contains(r.SessionId))
+                .ToListAsync();
+            _db.AuditResponses.RemoveRange(responses);
+
+            _db.AuditSessions.RemoveRange(sessions);
+        }
     }
 }

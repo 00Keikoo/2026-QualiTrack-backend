@@ -139,7 +139,6 @@ public class DepartmentController(AppDbContext db) : ControllerBase
         department.UpdatedAt = DateTime.UtcNow;
 
         await _db.SaveChangesAsync();
-        await _db.SaveChangesAsync();
 
         return Ok(new { message = $"Department berhasil di{(isActive ? "aktifkan" : "nonaktifkan")}" });
     }
