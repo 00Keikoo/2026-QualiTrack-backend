@@ -13,7 +13,7 @@ namespace QualiTrack.Controllers;
 public class ChecklistController(AppDbContext db) : ControllerBase
 {
     [HttpGet]
-    [Authorize(Roles = "Admin, QualityManager, AuditorInternal")]
+    [Authorize(Roles = "Admin,QualityManager,AuditorInternal")]
     public async Task<IActionResult> GetAll(
         [FromQuery] string? standard,
         [FromQuery] string? department)
@@ -42,14 +42,14 @@ public class ChecklistController(AppDbContext db) : ControllerBase
     }
 
     [HttpGet("{id}")]
-    [Authorize(Roles = "Admin, QualityManager, AuditorInternal")]
+    [Authorize(Roles = "Admin,QualityManager,AuditorInternal")]
     public async Task<IActionResult> GetById(Guid id)
     {
         var checklist = await db.Checklists
             .Include(c => c.Items)
             .FirstOrDefaultAsync(c => c.Id == id);
 
-        if (checklist is null) return NotFound();
+        if (checklist is null) return NotFound(new { message = "Checklist tidak ditemukan"});
 
         return Ok(new
         {
@@ -86,7 +86,7 @@ public class ChecklistController(AppDbContext db) : ControllerBase
     // Update judul/standard/department + item: item dengan Id di-update, tanpa Id ditambah,
     // item yang tidak dikirim lagi dihapus (kecuali sudah dipakai di audit)
     [HttpPut("{id}")]
-    [Authorize(Roles = "Admin, QualityManager")]
+    [Authorize(Roles = "Admin,QualityManager")]
     public async Task<IActionResult> Update(Guid id, UpdateChecklistDto dto)
     {
         if (dto.Items.Count == 0)
@@ -168,11 +168,11 @@ public class ChecklistController(AppDbContext db) : ControllerBase
     }
 
     [HttpDelete("{id}")]
-    [Authorize(Roles = "Admin, QualityManager")]
+    [Authorize(Roles = "Admin,QualityManager")]
     public async Task<IActionResult> Delete(Guid id)
     {
         var checklist = await db.Checklists.FindAsync(id);
-        if (checklist is null) return NotFound();
+        if (checklist is null) return NotFound(new { message = "Checklist tidak ditemukan"});
         db.Checklists.Remove(checklist);
         await db.SaveChangesAsync();
         return NoContent();

@@ -24,6 +24,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<User> Users => Set<User>();
     public DbSet<AuditSummary> AuditSummaries => Set<AuditSummary>();
     public DbSet<SpcAnalysis> SpcAnalyses => Set<SpcAnalysis>();
+    public DbSet<Department> Departments => Set<Department>();
 
     protected override void OnModelCreating(ModelBuilder mb)
     {
@@ -54,9 +55,13 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             .IsRequired(false);
 
         // Simpan data points SPC sebagai JSON
-        mb.Entity <SpcAnalysis>()
+        mb.Entity<SpcAnalysis>()
             .Property(s => s.DataPoints)
             .HasColumnType("jsonb");
+
+        // Department name dan code harus unik
+        mb.Entity<Department>().HasIndex(d => d.Name).IsUnique();
+        mb.Entity<Department>().HasIndex(d => d.Code).IsUnique();
 
         // Email harus unik
         mb.Entity<User>().HasIndex(u => u.Email).IsUnique();

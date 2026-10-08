@@ -75,7 +75,7 @@ public class CapaController(AppDbContext db) : ControllerBase
             .Include(c => c.Finding)
             .FirstOrDefaultAsync(c => c.Id == id);
 
-        if (capa is null) return NotFound();
+        if (capa is null) return NotFound(new { message = "CAPA tidak ditemukan"});
 
         if (User.IsInRole("Auditee"))
         {
@@ -140,7 +140,7 @@ public class CapaController(AppDbContext db) : ControllerBase
     public async Task<IActionResult> Update(Guid id, [FromBody] UpdateCapaRequestDto req)
     {
         var capa = await db.CAPAs.FindAsync(id);
-        if (capa is null) return NotFound();
+        if (capa is null) return NotFound(new { message = "CAPA tidak ditemukan"});
 
         if (User.IsInRole("Auditee"))
         {
@@ -169,7 +169,7 @@ public class CapaController(AppDbContext db) : ControllerBase
     public async Task<IActionResult> UpdateStatus(Guid id, [FromBody] CAPAStatus status)
     {
         var capa = await db.CAPAs.Include(c => c.CloseOut).FirstOrDefaultAsync(c => c.Id == id);
-        if (capa is null) return NotFound();
+        if (capa is null) return NotFound(new { message = "CAPA tidak ditemukan"});
         if (User.IsInRole("Auditee"))
         {
             var userId = Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
@@ -189,7 +189,7 @@ public class CapaController(AppDbContext db) : ControllerBase
     public async Task<IActionResult> AddAction(Guid id, [FromBody] AddCapaActionRequest req)
     {
         var capa = await db.CAPAs.FindAsync(id);
-        if (capa is null) return NotFound();
+        if (capa is null) return NotFound(new { message = "CAPA tidak ditemukan"});
         if (User.IsInRole("Auditee"))
         {
             var userId = Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
@@ -231,7 +231,7 @@ public class CapaController(AppDbContext db) : ControllerBase
     {
         var capa = await db.CAPAs.FirstOrDefaultAsync(c => c.Id == id);
 
-        if (capa is null) return NotFound();
+        if (capa is null) return NotFound(new { message = "CAPA tidak ditemukan"});
         if (User.IsInRole("Auditee"))
         {
             var userId = Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
@@ -281,7 +281,7 @@ public class CapaController(AppDbContext db) : ControllerBase
     public async Task<IActionResult> Delete(Guid id)
     {
         var capa = await db.CAPAs.FindAsync(id);
-        if (capa is null) return NotFound();
+        if (capa is null) return NotFound(new { message = "CAPA tidak ditemukan"});
         db.CAPAs.Remove(capa);
         await db.SaveChangesAsync();
         return NoContent();

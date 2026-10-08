@@ -12,7 +12,7 @@ namespace QualiTrack.Controllers;
 public class QualityScoreController(IQualityScoreService qualityScoreService) : ControllerBase
 {
     [HttpGet("trend")]
-    [Authorize(Roles = "Admin, QualityManager, Auditor, AuditorInternal, Auditee")]
+    [Authorize(Roles = "Admin,QualityManager,Auditor,AuditorInternal,Auditee")]
     public async Task<IActionResult> GetTrend([FromQuery] int? year)
     {
         var targetYear = year ?? DateTime.UtcNow.Year;
@@ -21,7 +21,7 @@ public class QualityScoreController(IQualityScoreService qualityScoreService) : 
     }
 
     [HttpGet("department-trend")]
-    [Authorize(Roles = "Admin, QualityManager, Auditor, AuditorInternal, Auditee")]
+    [Authorize(Roles = "Admin,QualityManager,Auditor,AuditorInternal,Auditee")]
     public async Task<IActionResult> GetDepartmentTrend([FromQuery] string timeframe = "all")
     {
         try
@@ -36,7 +36,7 @@ public class QualityScoreController(IQualityScoreService qualityScoreService) : 
     }
 
     [HttpGet("overall-trend")]
-    [Authorize(Roles = "Admin, QualityManager, Auditor, AuditorInternal, Auditee")]
+    [Authorize(Roles = "Admin,QualityManager,Auditor,AuditorInternal,Auditee")]
     public async Task<IActionResult> GetOverallTrend([FromQuery] string timeframe = "all")
     {
         try
