@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using QualiTrack.Models;
 using QualiTrack.Data;
 using QualiTrack.DTOs;
 using QualiTrack.Filters;
@@ -14,10 +15,9 @@ namespace QualiTrack.Controllers;
 [ValidateModelAttribute]
 public class AdminController(AppDbContext db) : ControllerBase
 {
-    private static readonly string[] ValidRoles = 
-        ["QualityManager", "Auditor", "AuditorInternal", "Auditee", "Admin"];
+    private static readonly string[] ValidRoles = UserRoles.AllRoles;
 
-    private static readonly string[] ValidStatuses = ["Active", "Inactive"];
+    private static readonly string[] ValidStatuses = UserStatuses.AllStatuses;
 
     // GET /api/admin/users
     // Daftar semua user dengan filter dan search
@@ -128,7 +128,7 @@ public class AdminController(AppDbContext db) : ControllerBase
             return NotFound(new { message = "User tidak ditemukan" });
 
         // Admin tidak boleh ubah role Admin lain
-        if (user.Role == "Admin")
+        if (user.Role == UserRoles.Admin)
             return BadRequest(new { message = "Admin tidak dapat mengubah role Admin lain" });
 
         // Validasi role
@@ -136,7 +136,7 @@ public class AdminController(AppDbContext db) : ControllerBase
             return BadRequest(new { message = $"Role tidak valid. Pilih: {string.Join(", ", ValidRoles)}" });
 
         // Admin tidak boleh assign role Admin ke user lain
-        if (req.Role == "Admin")
+        if (req.Role == UserRoles.Admin)
             return BadRequest(new { message = "Tidak dapat mengubah role user menjadi Admin" });
 
         user.Role = req.Role;
@@ -161,7 +161,7 @@ public class AdminController(AppDbContext db) : ControllerBase
             return NotFound(new { message = "User tidak ditemukan" });
 
         // Admin tidak boleh nonaktifkan Admin lain
-        if (user.Role == "Admin")
+        if (user.Role == UserRoles.Admin)
             return BadRequest(new { message = "Admin tidak dapat mengubah status Admin lain" });
 
         if (!ValidStatuses.Contains(req.Status))
