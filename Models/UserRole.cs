@@ -26,3 +26,15 @@ public static class UserRoles
         return NormalizeRole(role);
     }
 }
+public static class UserStatuses
+{
+    public const string Active = "Active";
+    public const string Inactive = "Inactive";
+
+    public static readonly string[] AllStatuses = { Active, Inactive };
+
+    public static bool IsValidStatus(string status)
+    {
+        return AllStatuses.Contains(status);
+    }
+}
