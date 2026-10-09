@@ -4,9 +4,9 @@ services:
     container_name: qualitrack_db
     restart: unless-stopped
     environment:
-      POSTGRES_DB: qualitrack
-      POSTGRES_USER: qualitrack_user
-      POSTGRES_PASSWORD: QualiTrack@2025!
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:
@@ -17,6 +17,21 @@ services:
       timeout: 5s
       retries: 5
 
+  minio:
+    image: minio/minio
+    container_name: qualitrack_minio
+    restart: unless-stopped
+    ports: 
+      - "9000:9000" 
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: QualiTrack@Minio2025
+    volumes:
+      - minio_data:/data
+    command: server /data --console-adress ":9001"
+    networks:
+      - qualitrack_net
   api:
     build: .
     container_name: qualitrack_api
@@ -26,20 +41,28 @@ services:
     environment:
       - ASPNETCORE_ENVIRONMENT=Production
       - ASPNETCORE_URLS=http://+:5144
-      - ConnectionStrings__Supabase=Host=db;Port=5432;Database=qualitrack;Username=qualitrack_user;Password=QualiTrack@2025!
+      - ConnectionStrings__Supabase=Host=db;Port=5432;Database=${POSTGRES_DB};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD}
       - Jwt__Key=${JWT_SECRET}
       - Jwt__Issuer=QualiTrack
       - Jwt__Audience=QualiTrack
+      - Email__Password=${OAUTH_PW} 
+      - S3__Endpoint=http://minio:9000
+      - S3__BucketName=qualitrack
+      - S3__AccessKey=minioadmin
+      - S3__SecretAccessKey=QualiTrack@Minio2025
     volumes:
       - uploads_data:/app/uploads
     depends_on:
       db:
         condition: service_healthy
+      minio:
+        condition: service_started
     networks:
       - qualitrack_net
 
 volumes:
   postgres_data:
+  minio_data:
   uploads_data:
   dataprotection_keys:
 

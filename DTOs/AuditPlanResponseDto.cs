@@ -24,6 +24,7 @@ public class ScheduleResponseDto
     public string AuditorName { get; set; } = string.Empty;  // Join dari User
     public DateTime ScheduledDate { get; set; }
     public string Department { get; set; } = string.Empty;
+    public DateTime? CompletedAt { get; set; }
     public bool IsFinished { get; set; }
 }
 

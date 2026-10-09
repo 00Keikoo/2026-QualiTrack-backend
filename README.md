@@ -1,23 +1,228 @@
-# QualiTrack API 🎯
+# QualiTrack Backend
 
-Backend API untuk sistem manajemen audit dan CAPA (Corrective & Preventive Action).
-
-Dibangun dengan **ASP.NET Core 10** + **Entity Framework Core** + **PostgreSQL**.
+Backend API untuk sistem **QualiTrack** — aplikasi manajemen audit internal, temuan (finding), dan tindakan perbaikan (CAPA) berbasis standar ISO 9001 & ISO 14001.
 
 ---
 
 ## Tech Stack
 
-| Layer | Teknologi |
+- **Framework**: ASP.NET Core 10
+- **ORM**: Entity Framework Core 10
+- **Database**: PostgreSQL 16
+- **Auth**: JWT Bearer Token
+- **Email**: MailKit (Gmail SMTP)
+- **PDF**: QuestPDF
+- **Storage**: Local filesystem (Docker volume)
+- **Deployment**: Docker + Docker Compose
+
+---
+
+## Cara Menjalankan
+
+### Lokal (tanpa Docker)
+
+```bash
+# Clone repo
+git clone https://github.com/pens-pbl/QualiTrack-backend.git
+cd QualiTrack-backend
+
+# Sesuaikan connection string di appsettings.json
+# Jalankan migration
+dotnet ef database update
+
+# Jalankan server
+dotnet run
+```
+
+### Lokal (dengan Docker)
+
+```bash
+# Buat file .env
+echo "JWT_SECRET=your-secret-key-minimal-32-chars" > .env
+
+# Build dan jalankan
+docker compose up -d --build
+
+# Cek status
+docker compose ps
+```
+
+### Server Production
+
+```bash
+ssh d4@10.154.0.116
+cd ~/apps/QualiTrack-backend
+git pull origin main
+docker compose down
+docker compose up -d --build
+```
+
+## Environment Variables
+
+| Variable | Keterangan |
 |---|---|
-| Framework | ASP.NET Core 10 |
-| ORM | Entity Framework Core 10 |
-| Database | PostgreSQL (Railway) |
-| Auth | JWT Bearer Token |
-| Password Hashing | BCrypt.Net |
-| API Docs | Swagger / OpenAPI |
-| Environment | DotNetEnv |
-| Deployment | Railway |
+| `ConnectionStrings__Supabase` | Connection string PostgreSQL |
+| `Jwt__Key` | Secret key JWT (min 32 karakter) |
+| `Jwt__Issuer` | Issuer JWT |
+| `Jwt__Audience` | Audience JWT |
+| `Storage__UseS3` | `true` untuk S3, `false` untuk local storage |
+
+---
+
+## API Endpoints
+
+Base URL: `https://be.qualitrack.labs.it.pens.ac.id`
+
+Auth header: `Authorization: Bearer {token}`
+
+### 🔐 Auth — `/api/Auth`
+
+| Method | Endpoint | Deskripsi | Auth |
+|---|---|---|---|
+| POST | `/register` | Register user baru + kirim OTP | ❌ |
+| POST | `/verify-email` | Verifikasi OTP email | ❌ |
+| POST | `/resend-otp` | Kirim ulang OTP | ❌ |
+| POST | `/login` | Login → dapat JWT token | ❌ |
+| POST | `/logout` | Logout | ✅ |
+| GET | `/whoami` | Info user yang sedang login | ✅ |
+| GET | `/profile` | Detail profil user | ✅ |
+| GET | `/auditors` | List user dengan role Auditor | ✅ |
+| GET | `/users` | List semua user | ✅ |
+| GET | `/pic-candidates` | List kandidat PIC untuk CAPA | ✅ |
+| PUT | `/update-profile` | Update nama lengkap | ✅ |
+| POST | `/change-password` | Ganti password | ✅ |
+| POST | `/upload-profile-photo` | Upload foto profil | ✅ |
+| POST | `/request-email-change-otp` | Request OTP untuk ganti email | ✅ |
+| POST | `/verify-email-change` | Verifikasi OTP → update email | ✅ |
+| POST | `/forgot-password/request-otp` | Request OTP lupa password | ❌ |
+| POST | `/forgot-password/verify-otp` | Verifikasi OTP → dapat reset token | ❌ |
+| POST | `/forgot-password/reset` | Reset password | ❌ |
+
+### 📋 Audit Plan — `/api/AuditPlan`
+
+| Method | Endpoint | Deskripsi | Auth |
+|---|---|---|---|
+| GET | `/` | List semua audit plan | ✅ |
+| GET | `/{id}` | Detail audit plan | ✅ |
+| POST | `/` | Buat audit plan baru | ✅ Admin/QM |
+| PUT | `/{id}` | Update audit plan | ✅ Admin/QM |
+| DELETE | `/{id}` | Hapus audit plan | ✅ Admin/QM |
+
+### 🗓️ Audit Session — `/api/AuditSession`
+
+| Method | Endpoint | Deskripsi | Auth |
+|---|---|---|---|
+| POST | `/` | Mulai sesi audit | ✅ |
+| GET | `/{id}` | Detail sesi audit | ✅ |
+| GET | `/by-schedule/{scheduleId}` | Sesi berdasarkan schedule | ✅ |
+| POST | `/{sessionId}/summary` | Tambah/update summary sesi | ✅ |
+| GET | `/{sessionId}/summary` | Ambil summary sesi | ✅ |
+
+### ✅ Audit Response — `/api/AuditResponse`
+
+| Method | Endpoint | Deskripsi | Auth |
+|---|---|---|---|
+| POST | `/batch` | Submit jawaban checklist sekaligus | ✅ |
+| POST | `/progress` | Simpan progress checklist | ✅ |
+| GET | `/by-session/{sessionId}` | Jawaban berdasarkan sesi | ✅ |
+
+### 📝 Finding — `/api/Finding`
+
+| Method | Endpoint | Deskripsi | Auth |
+|---|---|---|---|
+| GET | `/` | List finding + filter | ✅ |
+| GET | `/{id}` | Detail finding | ✅ |
+| GET | `/without-capa` | Finding yang belum ada CAPA | ✅ |
+| GET | `/by-session/{sessionId}` | Finding berdasarkan sesi | ✅ |
+| POST | `/` | Catat finding baru | ✅ |
+| PUT | `/{id}` | Update finding | ✅ |
+| DELETE | `/{id}` | Hapus finding | ✅ |
+
+### 🔧 CAPA — `/api/Capa`
+
+| Method | Endpoint | Deskripsi | Auth |
+|---|---|---|---|
+| GET | `/` | List semua CAPA | ✅ |
+| GET | `/{id}` | Detail CAPA | ✅ |
+| GET | `/overdue` | CAPA yang melewati deadline | ✅ |
+| POST | `/finding/{findingId}` | Buat CAPA dari finding | ✅ |
+| PUT | `/{id}` | Update CAPA | ✅ |
+| POST | `/{id}/actions` | Tambah action CAPA | ✅ |
+| POST | `/{id}/closeout` | Close out CAPA | ✅ |
+| DELETE | `/{id}` | Hapus CAPA | ✅ |
+
+### 📁 Upload Evidence — `/api/Upload`
+
+| Method | Endpoint | Deskripsi | Auth |
+|---|---|---|---|
+| POST | `/finding/{findingId}` | Upload evidence finding | ✅ |
+| POST | `/capa-action/{actionId}` | Upload evidence CAPA action | ✅ |
+| GET | `/finding/{findingId}` | List file evidence finding | ✅ |
+| DELETE | `/{fileId}` | Hapus file evidence | ✅ |
+
+### 📋 Checklist — `/api/Checklist`
+
+| Method | Endpoint | Deskripsi | Auth |
+|---|---|---|---|
+| GET | `/` | List semua checklist template | ✅ |
+| GET | `/{id}` | Detail checklist | ✅ |
+| GET | `/{id}/items` | Item-item checklist | ✅ |
+| POST | `/` | Buat checklist baru | ✅ |
+| DELETE | `/{id}` | Hapus checklist | ✅ |
+
+### 📊 Dashboard — `/api/Dashboard`
+
+| Method | Endpoint | Deskripsi | Auth |
+|---|---|---|---|
+| GET | `/summary` | Summary cards dashboard | ✅ |
+| GET | `/compliance-score` | Compliance score per department | ✅ |
+| GET | `/audit-schedule` | Jadwal audit bulanan | ✅ |
+| GET | `/monthly-report` | Laporan bulanan | ✅ |
+
+### 📄 Audit Report — `/api/AuditReport`
+
+| Method | Endpoint | Deskripsi | Auth |
+|---|---|---|---|
+| GET | `/` | List audit yang sudah completed | ✅ |
+| GET | `/{sessionId}` | Detail laporan audit | ✅ |
+
+### 📄 PDF — `/api/Pdf`
+
+| Method | Endpoint | Deskripsi | Auth |
+|---|---|---|---|
+| GET | `/audit-report/{sessionId}` | Generate & download PDF laporan audit | ✅ |
+
+### ❤️ Health Check — `/api/Health`
+
+| Method | Endpoint | Deskripsi | Auth |
+|---|---|---|---|
+| GET | `/` | Cek status server | ❌ |
+
+---
+
+## Auth Flow
+
+```
+Register → OTP dikirim ke email → verify-email → bisa login
+
+Lupa password:
+forgot-password/request-otp → forgot-password/verify-otp → forgot-password/reset
+
+Ganti email:
+request-email-change-otp → verify-email-change
+```
+
+---
+
+## Role
+
+| Role | Keterangan |
+|---|---|
+| `Admin` | Akses penuh |
+| `QualityManager` | Kelola audit plan, lihat semua data |
+| `Auditor` | Jalankan sesi audit, catat finding |
+| `AuditorInternal` | Auditor internal |
+| `Auditee` | Pihak yang diaudit |
 
 ---
 
@@ -25,478 +230,19 @@ Dibangun dengan **ASP.NET Core 10** + **Entity Framework Core** + **PostgreSQL**
 
 ```
 QualiTrack/
-├── Controllers/
-│   ├── AuthController.cs           # Register, Login, Logout, Forgot Password
-│   ├── AuditPlanController.cs      # CRUD Audit Plan + Role-based access
-│   ├── FindingController.cs        # CRUD Finding + filter status/kategori/tanggal
-│   ├── CapaController.cs           # CRUD CAPA + actions + closeout + overdue
-│   ├── AuditSessionController.cs   # CRUD Audit Session
-│   ├── ChecklistController.cs      # CRUD Checklist + filter + items endpoint
-│   └── UploadController.cs         # Upload foto/dokumen evidence
-├── Models/
-│   ├── User.cs
-│   ├── AuditPlan.cs                # + field Priority (Common, Priority)
-│   ├── AuditSchedule.cs
-│   ├── AuditSession.cs
-│   ├── AuditResponse.cs
-│   ├── Checklist.cs                # + field Department
-│   ├── ChecklistItem.cs
-│   ├── Finding.cs
-│   ├── CAPA.cs
-│   ├── CAPAAction.cs
-│   ├── CloseOutVerification.cs
-│   └── EvidenceFile.cs
-├── DTOs/
-│   ├── AuthDtos.cs                 # RegisterRequest, LoginRequest, AuthResponse, ForgotPasswordRequest
-│   ├── AuditPlanDtos.cs            # CreateAuditPlanDto, UpdateAuditPlanDto, CreateScheduleDto
-│   └── UpdateCapaRequest.cs
-├── Data/
-│   ├── AppDbContext.cs
-│   └── DbSeeder.cs                 # Seed data checklist template per standar & departemen
-├── Filters/
-│   └── ValidateModelAttribute.cs
-├── Middlewares/
-│   └── GlobalExceptionMiddleware.cs
-├── Migrations/                     # EF Core migrations
-├── uploads/                        # File evidence yang diupload
-└── Program.cs
+├── Controllers/       # API endpoints
+├── Models/            # Entity models
+├── DTOs/              # Data Transfer Objects
+├── Data/              # DbContext + seeder
+├── Services/          # Email, PDF, storage services
+├── Migrations/        # EF Core migrations
+├── Middlewares/       # Global exception handler
+├── Filters/           # Validation filters
+├── Repositories/      # Repository pattern
+├── Dockerfile
+├── docker-compose.yml
+└── docker-compose.dev.yml
 ```
 
 ---
-
-## Cara Menjalankan
-
-### Prasyarat
-- .NET 10 SDK
-- PostgreSQL
-
-### Setup
-
-**1. Clone repo**
-```bash
-git clone <repo-url>
-cd QualiTrack
-```
-
-**2. Sesuaikan `appsettings.json`**
-```json
-{
-  "ConnectionStrings": {
-    "Supabase": "Host=localhost;Database=qualitrack;Username=postgres;Password=postgres"
-  },
-  "Jwt": {
-    "Key": "qualitrack-secret-key-minimal-32-characters-panjang",
-    "Issuer": "QualiTrack",
-    "Audience": "QualiTrack"
-  }
-}
-```
-
-**3. Jalankan migration**
-```bash
-dotnet ef database update
-```
-
-**4. Jalankan aplikasi**
-```bash
-dotnet run
-```
-
-> Saat pertama jalan, aplikasi otomatis seed 4 template checklist ke database.
-
-**5. Buka Swagger**
-```
-http://localhost:5146/swagger
-```
-
----
-
-## Deployment (Railway)
-
-Backend dan database di-deploy ke Railway.
-
-**Base URL Production:**
-```
-https://backendqualitrack-production.up.railway.app
-```
-
-**Environment Variables di Railway:**
-| Variable | Keterangan |
-|---|---|
-| `ConnectionStrings__Supabase` | Connection string ke PostgreSQL Railway |
-| `Jwt__Key` | Secret key JWT |
-| `Jwt__Issuer` | Issuer JWT |
-| `Jwt__Audience` | Audience JWT |
-
-**Catatan deployment:**
-- Database menggunakan `EnsureCreatedAsync()` saat startup untuk membuat tabel otomatis
-- Seed data checklist template dijalankan otomatis saat pertama deploy
-- Railway mendeteksi .NET 10 secara otomatis via `railpack`
-
----
-
-## Integrasi Mobile
-
-Backend ini dirancang sebagai REST API untuk dikonsumsi mobile app (Flutter, React Native, dll).
-
-**Alur integrasi:**
-1. **Register/Login** → dapat JWT token
-2. **Simpan token** di local storage mobile
-3. **Setiap request** sertakan token di header:
-   ```
-   Authorization: Bearer <token>
-   ```
-4. Backend validasi token → proses → kirim response JSON
-
-**Contoh di Flutter dengan package `dio`:**
-```dart
-// Login
-final response = await dio.post(
-  'https://backendqualitrack-production.up.railway.app/api/Auth/login',
-  data: {'email': email, 'password': password},
-);
-final token = response.data['token'];
-
-// Request data dengan token
-dio.options.headers['Authorization'] = 'Bearer $token';
-final checklists = await dio.get('/api/Checklists');
-```
-
-> **Catatan:** Endpoint `/api/Auth/register` dan `/api/Auth/login` adalah POST. Membuka URL di browser akan menghasilkan HTTP 405 (Method Not Allowed) — ini normal, bukan error.
-
----
-
-## API Endpoints
-
-### 🔐 Authentication
-
-| Method | Endpoint | Deskripsi | Auth |
-|---|---|---|---|
-| POST | `/api/Auth/register` | Daftar user baru | ❌ |
-| POST | `/api/Auth/login` | Login, dapat JWT token | ❌ |
-| POST | `/api/Auth/logout` | Logout | ❌ |
-| POST | `/api/Auth/forgot-password` | Reset password | ❌ |
-| GET | `/api/Auth/whoami` | Cek info user dari token | ✅ |
-
-**Register:**
-```json
-POST /api/Auth/register
-{
-  "fullName": "Dika Admin",
-  "email": "dika@qualitrack.com",
-  "password": "123456",
-  "role": "Admin"
-}
-```
-Role yang valid: `Admin`, `QualityManager`, `Auditor`, `Auditee`
-
-**Login:**
-```json
-POST /api/Auth/login
-{
-  "email": "dika@qualitrack.com",
-  "password": "123456"
-}
-```
-Response:
-```json
-{
-  "token": "eyJhbGci...",
-  "role": "Admin",
-  "fullName": "Dika Admin"
-}
-```
-
-**Forgot Password:**
-```json
-POST /api/Auth/forgot-password
-{
-  "email": "dika@qualitrack.com",
-  "newPassword": "newpass123",
-  "confirmPassword": "newpass123"
-}
-```
-
-> Token JWT dipakai di header `Authorization: Bearer <token>` untuk semua endpoint yang butuh auth.
-
----
-
-### 📋 Audit Plan
-
-| Method | Endpoint | Deskripsi | Role |
-|---|---|---|---|
-| GET | `/api/AuditPlan` | List semua audit plan | Admin, QualityManager, Auditor |
-| GET | `/api/AuditPlan/{id}` | Detail audit plan | Admin, QualityManager, Auditor |
-| POST | `/api/AuditPlan` | Buat audit plan baru | Admin, QualityManager |
-| PUT | `/api/AuditPlan/{id}` | Update audit plan | Admin, QualityManager |
-| DELETE | `/api/AuditPlan/{id}` | Hapus audit plan | Admin |
-
-**Buat Audit Plan:**
-```json
-POST /api/AuditPlan
-Authorization: Bearer <token>
-
-{
-  "title": "Audit ISO 9001 Q1 2026",
-  "year": 2026,
-  "standard": "ISO9001",
-  "priority": "Common",
-  "description": "Audit kuartal pertama 2026",
-  "schedules": [
-    {
-      "clauseRef": "ISO9001 8.1",
-      "auditorId": "uuid-user-auditor",
-      "scheduledDate": "2026-06-15",
-      "department": "Warehouse"
-    }
-  ]
-}
-```
-
-> **Catatan:** `auditorId` adalah ID user yang memiliki role `Auditor`. Daftarkan user auditor terlebih dahulu via `/api/Auth/register` dengan role `Auditor`, lalu gunakan ID-nya di sini.
-
-**Priority:** `Common` (default), `Priority`
-
-Response:
-```json
-{
-  "message": "Audit plan berhasil dibuat",
-  "data": { ... }
-}
-```
-
----
-
-### 🔍 Finding
-
-| Method | Endpoint | Deskripsi | Auth |
-|---|---|---|---|
-| GET | `/api/Finding` | List semua finding | ✅ |
-| GET | `/api/Finding/{id}` | Detail finding | ✅ |
-| POST | `/api/Finding` | Catat finding baru | ✅ |
-| PATCH | `/api/Finding/{id}/status` | Update status finding | ✅ |
-| DELETE | `/api/Finding/{id}` | Hapus finding | ✅ |
-
-**Filter Finding:**
-```
-GET /api/Finding?status=Open
-GET /api/Finding?category=MajorNC
-GET /api/Finding?from=2026-01-01&to=2026-12-31
-GET /api/Finding?status=Open&category=MajorNC&from=2026-01-01
-```
-
-**Kategori:** `MajorNC`, `MinorNC`, `Observation`, `OFI`
-
-**Status:** `Open` → `InProgress` → `Closed`
-
-**Buat Finding:**
-```json
-POST /api/Finding
-{
-  "category": "MajorNC",
-  "description": "Prosedur tidak terdokumentasi di bagian produksi",
-  "clauseRef": "ISO9001 8.1"
-}
-```
-
-**Update Status:**
-```
-PATCH /api/Finding/{id}/status
-"InProgress"
-```
-
----
-
-### ⚙️ CAPA
-
-| Method | Endpoint | Deskripsi | Auth |
-|---|---|---|---|
-| GET | `/api/Capa` | List semua CAPA | ✅ |
-| GET | `/api/Capa/{id}` | Detail CAPA | ✅ |
-| GET | `/api/Capa/overdue` | CAPA yang melewati deadline | ✅ |
-| POST | `/api/Capa/finding/{findingId}` | Buat CAPA dari finding | ✅ |
-| PUT | `/api/Capa/{id}` | Update CAPA | ✅ |
-| PATCH | `/api/Capa/{id}/status` | Update status CAPA | ✅ |
-| POST | `/api/Capa/{id}/actions` | Tambah progress action | ✅ |
-| POST | `/api/Capa/{id}/closeout` | Verifikasi close out | ✅ |
-| DELETE | `/api/Capa/{id}` | Hapus CAPA | ✅ |
-
-**Buat CAPA:**
-```json
-POST /api/Capa/finding/{findingId}
-{
-  "rootCause": "Tidak ada SOP tertulis",
-  "correctiveAction": "Buat SOP dokumen produksi",
-  "preventiveAction": "Training rutin tiap bulan",
-  "deadline": "2026-06-30"
-}
-```
-
-**Status CAPA:** `Open` → `InProgress` → `PendingVerification` → `Closed`
-
-**Tambah Action:**
-```json
-POST /api/Capa/{id}/actions
-{
-  "description": "Draft SOP sudah selesai dibuat",
-  "doneById": "user-id"
-}
-```
-
-**Close Out:**
-```json
-POST /api/Capa/{id}/closeout
-{
-  "isEffective": true,
-  "verificationNotes": "SOP sudah diimplementasikan dan efektif",
-  "verifiedById": "user-id"
-}
-```
-
-> Close out otomatis mengubah status Finding terkait menjadi `Closed`
-
----
-
-### ✅ Checklist
-
-| Method | Endpoint | Deskripsi | Auth |
-|---|---|---|---|
-| GET | `/api/Checklist` | List semua checklist | ❌ |
-| GET | `/api/Checklist/{id}` | Detail checklist | ❌ |
-| GET | `/api/Checklist/{id}/items` | Items checklist urut by orderIndex | ❌ |
-| POST | `/api/Checklist` | Buat checklist baru | ❌ |
-| DELETE | `/api/Checklist/{id}` | Hapus checklist | ❌ |
-
-**Filter Checklist:**
-```
-GET /api/Checklist?standard=ISO9001
-GET /api/Checklist?department=Warehouse
-GET /api/Checklist?standard=ISO9001&department=Warehouse
-```
-
-**Template yang sudah tersedia (seed data):**
-
-| Template | Standard | Departemen | Jumlah Item |
-|---|---|---|---|
-| ISO 9001 - Warehouse | ISO9001 | Warehouse | 5 |
-| ISO 14001 - Warehouse | ISO14001 | Warehouse | 5 |
-| ISO 9001 - Produksi | ISO9001 | Produksi | 5 |
-| ISO 14001 - Produksi | ISO14001 | Produksi | 5 |
-
----
-
-### 📁 Upload File Evidence
-
-| Method | Endpoint | Deskripsi |
-|---|---|---|
-| POST | `/api/Upload/finding/{findingId}` | Upload foto/dokumen untuk finding |
-| POST | `/api/Upload/capa-action/{actionId}` | Upload foto/dokumen untuk CAPA action |
-| GET | `/api/Upload/finding/{findingId}` | List file evidence finding |
-
-**Upload:**
-```bash
-curl -X POST /api/Upload/finding/{findingId} \
-  -F "file=@/path/to/foto.jpg"
-```
-
-Format yang didukung: `JPG`, `PNG`, `PDF`
-
-Ukuran maksimal: **10 MB**
-
-Response:
-```json
-{
-  "fileId": "uuid",
-  "fileName": "foto.jpg",
-  "url": "/uploads/uuid_foto.jpg"
-}
-```
-
----
-
-## Alur Lengkap Audit
-
-```
-1. Register & Login → dapat JWT token
-        ↓
-2. Buat Audit Plan (dengan Priority)
-        ↓
-3. Pilih Checklist template (filter by standard & department)
-        ↓
-4. Jalankan AuditSession
-        ↓
-5. Isi AuditResponse per ChecklistItem + upload foto evidence
-        ↓
-6. Catat Finding (MajorNC / MinorNC / Observation / OFI)
-        ↓
-7. Buat CAPA dari Finding
-        ↓
-8. Tambah CAPA Actions (progress update)
-        ↓
-9. Close Out + verifikasi efektivitas
-        ↓
-10. Finding & CAPA otomatis Closed ✅
-```
-
----
-
-## Database Schema
-
-```
-User
- └── CAPA (sebagai PIC)
- └── AuditSchedule (sebagai Auditor)
-
-AuditPlan (+ Priority, Description)
- └── AuditSchedule (auditor per klausul, per departemen)
-      └── AuditSession
-           ├── AuditResponse (jawaban checklist)
-           │    └── EvidenceFile (foto)
-           └── Finding
-                └── CAPA
-                     ├── CAPAAction
-                     │    └── EvidenceFile
-                     └── CloseOutVerification
-
-Checklist (+ Department)
- └── ChecklistItem
-```
-
----
-
-## Migrations
-
-| Migration | Deskripsi |
-|---|---|
-| `InitialCreate` | Schema awal semua tabel |
-| `AddUserTable` | Tabel User untuk auth |
-| `MakeSessionIdNullable` | SessionId di Finding jadi nullable |
-| `AddAuditPriority` | Field Priority di AuditPlan |
-| `AddDepartmentToChecklist` | Field Department di Checklist |
-
----
-
-## Catatan Pengembangan
-
-- **Database:** PostgreSQL di Railway, tabel dibuat otomatis via `EnsureCreatedAsync` saat startup
-- **File Storage:** File tersimpan di folder `uploads/` lokal di server Railway
-- **Forgot Password:** Saat ini reset langsung via API tanpa email
-- **User Management:** CRUD user belum ada; tambah user via endpoint register
-- **AuditPriority:** Enum `Common` dan `Priority` didefinisikan di `QualiTrack.Models` — pastikan file DTO meng-import `using QualiTrack.Models`
-- **Testing endpoint:** Gunakan Postman atau Thunder Client, bukan browser langsung (browser hanya support GET)
-
----
-
-## Sprint Progress
-
-| Fitur | Status | Sprint |
-|---|---|---|
-| Authentication (register, login, logout, forgot password) | ✅ Done | Sprint 1 |
-| Audit Plan CRUD + Priority + Description | ✅ Done | Sprint 1 |
-| Finding CRUD + filter + logic status | ✅ Done | Sprint 1 |
-| CAPA CRUD + actions + closeout + overdue | ✅ Done | Sprint 1 |
-| Checklist template seed data + Department | ✅ Done | Sprint 1 |
-| Upload file evidence | ✅ Done | Sprint 1 |
-| Role-based access control | ✅ Done | Sprint 1 |
-| Deploy ke Railway (backend + database) | ✅ Done | Sprint 1 |
 

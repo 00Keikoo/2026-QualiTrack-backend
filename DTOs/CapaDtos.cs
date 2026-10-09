@@ -18,8 +18,6 @@ public class CreateCapaRequest
 
     [Required(ErrorMessage = "Deadline wajib diisi")]
     public DateOnly? Deadline { get; set; }
-
-    [Required(ErrorMessage = "PIC harus diisi")]
     public Guid? PicId { get; set; }
     public string? PicName { get; set; }
 }
@@ -82,6 +80,7 @@ public class CAPAResponseDto
     public Guid? PicId { get; set; }
     public string? PicName { get; set; }
     public DateTime CreatedAt { get; set; }
+    public DateTime? ClosedAt { get; set; }
     public DateTime? UpdatedAt { get; set; }
     public List<CAPAActionResponseDto> Actions { get; set; } = new();
     public CloseOutResponseDto? CloseOut { get; set; }
