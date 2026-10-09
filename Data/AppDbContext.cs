@@ -25,6 +25,9 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<AuditSummary> AuditSummaries => Set<AuditSummary>();
     public DbSet<SpcAnalysis> SpcAnalyses => Set<SpcAnalysis>();
     public DbSet<Department> Departments => Set<Department>();
+    public DbSet<SpcUnit> SpcUnits => Set<SpcUnit>();
+    public DbSet<IsoStandard> IsoStandards => Set<IsoStandard>();
+    public DbSet<AdminActivityLog> AdminActivityLogs => Set<AdminActivityLog>();
 
     protected override void OnModelCreating(ModelBuilder mb)
     {
@@ -48,6 +51,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
         mb.Entity<CAPA>().HasIndex(c => new { c.Status, c.Deadline });
         mb.Entity<AuditSession>().HasIndex(s => s.ScheduleId);
         mb.Entity<AuditSession>().HasIndex(s => new { s.Status, s.CompletedAt });
+
         mb.Entity<EvidenceFile>()
             .HasOne<Finding>()
             .WithMany(f => f.Evidences)
@@ -58,6 +62,18 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
         mb.Entity<SpcAnalysis>()
             .Property(s => s.DataPoints)
             .HasColumnType("jsonb");
+        
+        mb.Entity<Checklist>()
+            .HasOne(c => c.IsoStandard)
+            .WithMany(i => i.Checklists)
+            .HasForeignKey(c => c.IsoStandardId)
+            .IsRequired(false);
+
+        mb.Entity<Checklist>()
+            .HasOne(c => c.DepartmentNavigation)
+            .WithMany(d => d.Checklists)
+            .HasForeignKey(c => c.DepartmentId)
+            .IsRequired(false);
 
         // Department name dan code harus unik
         mb.Entity<Department>().HasIndex(d => d.Name).IsUnique();
@@ -65,5 +81,9 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
 
         // Email harus unik
         mb.Entity<User>().HasIndex(u => u.Email).IsUnique();
+
+        // IsoStandard code harus unik
+        mb.Entity<IsoStandard>().HasIndex(i => i.Code).IsUnique();
+        mb.Entity<SpcUnit>().HasIndex(s => s.Name).IsUnique();  
     }
 }

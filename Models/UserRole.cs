@@ -38,3 +38,11 @@ public static class UserStatuses
         return AllStatuses.Contains(status);
     }
 }
+public static class AdminActions
+{
+    public const string Create = "CREATE";
+    public const string Update = "UPDATE";
+    public const string Delete = "DELETE";
+    public const string Activate = "ACTIVATE";
+    public const string Deactivate = "DEACTIVATE";
+}

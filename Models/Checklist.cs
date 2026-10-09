@@ -1,5 +1,4 @@
 using QualiTrack.Models;
-
 namespace QualiTrack.Models;
 
 public class Checklist
@@ -8,6 +7,10 @@ public class Checklist
     public string Title { get; set; } = string.Empty;
     public string Standard { get; set; } = string.Empty;
     public string Department { get; set; } = string.Empty;
+    public Guid? IsoStandardId { get; set; }
+    public IsoStandard? IsoStandard { get; set; }
+    public Guid? DepartmentId { get; set; }
+    public Department? DepartmentNavigation { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
     public ICollection<ChecklistItem> Items { get; set; } = [];
