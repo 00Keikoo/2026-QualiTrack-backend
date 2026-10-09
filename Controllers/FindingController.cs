@@ -111,7 +111,7 @@ public class FindingController(AppDbContext db) : ControllerBase
     public async Task<IActionResult> Update(Guid id, [FromBody] UpdateFindingRequest req)
     {
         var finding = await db.Findings.FindAsync(id);
-        if (finding is null) return NotFound();
+        if (finding is null) return NotFound(new { message = "Finding tidak ditemukan"});
 
         if (req.ReporterId.HasValue)
         {
@@ -141,7 +141,7 @@ public class FindingController(AppDbContext db) : ControllerBase
     public async Task<IActionResult> UpdateStatus(Guid id, [FromBody] FindingStatus status)
     {
         var finding = await db.Findings.FindAsync(id);
-        if (finding is null) return NotFound();
+        if (finding is null) return NotFound(new { message = "Finding tidak ditemukan"});
         finding.Status = status;
         await db.SaveChangesAsync();
         return NoContent();
@@ -152,7 +152,7 @@ public class FindingController(AppDbContext db) : ControllerBase
     public async Task<IActionResult> Delete(Guid id)
     {
         var finding = await db.Findings.FindAsync(id);
-        if (finding is null) return NotFound();
+        if (finding is null) return NotFound(new { message = "Finding tidak ditemukan"});
         db.Findings.Remove(finding);
         await db.SaveChangesAsync();
         return NoContent();

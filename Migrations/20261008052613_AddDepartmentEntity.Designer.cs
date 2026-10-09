@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using QualiTrack.Data;
@@ -11,9 +12,11 @@ using QualiTrack.Data;
 namespace QualiTrack.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20261008052613_AddDepartmentEntity")]
+    partial class AddDepartmentEntity
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -21,39 +24,6 @@ namespace QualiTrack.Migrations
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
-
-            modelBuilder.Entity("QualiTrack.Models.AdminActivityLog", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("Action")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<Guid>("AdminId")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp without time zone");
-
-                    b.Property<string>("Description")
-                        .HasColumnType("text");
-
-                    b.Property<string>("EntityName")
-                        .HasColumnType("text");
-
-                    b.Property<string>("EntityType")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("AdminId");
-
-                    b.ToTable("AdminActivityLogs");
-                });
 
             modelBuilder.Entity("QualiTrack.Models.AuditPlan", b =>
                 {
@@ -302,12 +272,6 @@ namespace QualiTrack.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
-                    b.Property<Guid?>("DepartmentId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid?>("IsoStandardId")
-                        .HasColumnType("uuid");
-
                     b.Property<string>("Standard")
                         .IsRequired()
                         .HasColumnType("text");
@@ -317,10 +281,6 @@ namespace QualiTrack.Migrations
                         .HasColumnType("text");
 
                     b.HasKey("Id");
-
-                    b.HasIndex("DepartmentId");
-
-                    b.HasIndex("IsoStandardId");
 
                     b.ToTable("Checklists");
                 });
@@ -526,37 +486,6 @@ namespace QualiTrack.Migrations
                     b.ToTable("Findings");
                 });
 
-            modelBuilder.Entity("QualiTrack.Models.IsoStandard", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("Code")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp without time zone");
-
-                    b.Property<string>("Description")
-                        .HasColumnType("text");
-
-                    b.Property<bool>("IsActive")
-                        .HasColumnType("boolean");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("Code")
-                        .IsUnique();
-
-                    b.ToTable("IsoStandards");
-                });
-
             modelBuilder.Entity("QualiTrack.Models.SpcAnalysis", b =>
                 {
                     b.Property<Guid>("Id")
@@ -627,37 +556,6 @@ namespace QualiTrack.Migrations
                     b.ToTable("SpcAnalyses");
                 });
 
-            modelBuilder.Entity("QualiTrack.Models.SpcUnit", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp without time zone");
-
-                    b.Property<string>("Description")
-                        .HasColumnType("text");
-
-                    b.Property<bool>("IsActive")
-                        .HasColumnType("boolean");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<string>("Symbol")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("Name")
-                        .IsUnique();
-
-                    b.ToTable("SpcUnits");
-                });
-
             modelBuilder.Entity("QualiTrack.Models.User", b =>
                 {
                     b.Property<Guid>("Id")
@@ -708,17 +606,6 @@ namespace QualiTrack.Migrations
                         .IsUnique();
 
                     b.ToTable("Users");
-                });
-
-            modelBuilder.Entity("QualiTrack.Models.AdminActivityLog", b =>
-                {
-                    b.HasOne("QualiTrack.Models.User", "Admin")
-                        .WithMany()
-                        .HasForeignKey("AdminId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Admin");
                 });
 
             modelBuilder.Entity("QualiTrack.Models.AuditResponse", b =>
@@ -823,21 +710,6 @@ namespace QualiTrack.Migrations
                     b.Navigation("Capa");
 
                     b.Navigation("DoneBy");
-                });
-
-            modelBuilder.Entity("QualiTrack.Models.Checklist", b =>
-                {
-                    b.HasOne("QualiTrack.Models.Department", "DepartmentNavigation")
-                        .WithMany("Checklists")
-                        .HasForeignKey("DepartmentId");
-
-                    b.HasOne("QualiTrack.Models.IsoStandard", "IsoStandard")
-                        .WithMany("Checklists")
-                        .HasForeignKey("IsoStandardId");
-
-                    b.Navigation("DepartmentNavigation");
-
-                    b.Navigation("IsoStandard");
                 });
 
             modelBuilder.Entity("QualiTrack.Models.ChecklistItem", b =>
@@ -947,21 +819,11 @@ namespace QualiTrack.Migrations
                     b.Navigation("Items");
                 });
 
-            modelBuilder.Entity("QualiTrack.Models.Department", b =>
-                {
-                    b.Navigation("Checklists");
-                });
-
             modelBuilder.Entity("QualiTrack.Models.Finding", b =>
                 {
                     b.Navigation("Capa");
 
                     b.Navigation("Evidences");
-                });
-
-            modelBuilder.Entity("QualiTrack.Models.IsoStandard", b =>
-                {
-                    b.Navigation("Checklists");
                 });
 #pragma warning restore 612, 618
         }

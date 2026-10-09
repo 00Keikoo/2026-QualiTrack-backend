@@ -15,6 +15,7 @@ public class UploadController(AppDbContext db, IStorageService storage ) : Contr
     private readonly string[] _allowedTypes = ["image/jpeg", "image/png", "image/jpg", "application/pdf"];
     private const int MaxImageWidth = 1280;
     private const int JpegQuality = 75;
+    private const long MaxFileSizeBytes = 10 * 1024 * 1024; // 10MB
 
     [HttpPost("finding/{findingId}")]
     public async Task<IActionResult> UploadForFinding(Guid findingId, IFormFile file)
@@ -22,8 +23,17 @@ public class UploadController(AppDbContext db, IStorageService storage ) : Contr
         var finding = await db.Findings.FindAsync(findingId);
         if (finding is null) return NotFound("Finding tidak ditemukan");
 
+        if (file == null || file.Length == 0)
+            return BadRequest(new { message = "File tidak boleh kosong" });
+
+        if (file.Length > MaxFileSizeBytes)
+            return BadRequest(new { message = $"File terlalu besar. Maksimal {MaxFileSizeBytes / (1024 * 1024)}MB" });
+
+        if (!_allowedTypes.Contains(file.ContentType))
+            return BadRequest(new { message = "Format file tidak didukung. Gunakan JPG, PNG atau PDF" });
+
         var key = await storage.UploadFileAsync(file);
-        if (key is null) return BadRequest("Format file tidak didukung. Gunakan JPG, PNG, atau PDF");
+        if (key is null) return BadRequest(new { message = "Gagal menyimpan file" });
 
         var evidence = new EvidenceFile
         {
@@ -52,8 +62,17 @@ public class UploadController(AppDbContext db, IStorageService storage ) : Contr
         var action = await db.CAPAActions.FindAsync(actionId);
         if (action is null) return NotFound("CAPA Action tidak ditemukan");
 
+        if (file == null || file.Length == 0)
+            return BadRequest(new { message = "File tidak boleh kosong" });
+
+        if (file.Length > MaxFileSizeBytes)
+            return BadRequest(new { message = $"File terlalu besar. Maksimal 10MB" });
+
+        if (!_allowedTypes.Contains(file.ContentType))
+            return BadRequest(new { message = "Format file tidak didukung. Gunakan JPG, PNG, atau PDF" });
+
         var key = await storage.UploadFileAsync(file);
-        if (key is null) return BadRequest("Format file tidak didukung. Gunakan JPG, PNG, atau PDF");
+        if (key is null) return BadRequest(new { message = "Gagal menyimpan file" });
 
         var evidence = new EvidenceFile
         {
@@ -139,10 +158,17 @@ public class UploadController(AppDbContext db, IStorageService storage ) : Contr
         if (response.Answer != ResponseAnswer.Conform)
             return BadRequest(new { message = "Upload evidence hanya untuk jawaban PASS" });
 
+        if (file == null || file.Length == 0)
+            return BadRequest(new { message = "File tidak boleh kosong" });
+
+        if (file.Length > MaxFileSizeBytes)
+            return BadRequest(new { message = $"File terlalu besar. Maksimal {MaxFileSizeBytes / (1024 * 1024)}MB" });
+
         if (!_allowedTypes.Contains(file.ContentType))
             return BadRequest(new { message = "Format file tidak didukung. Gunakan JPG, PNG, atau PDF" });
 
         var key = await storage.UploadFileAsync(file);
+        if (key is null) return BadRequest(new { message = "Gagal menyimpan file" });
 
         var evidence = new EvidenceFile
         {

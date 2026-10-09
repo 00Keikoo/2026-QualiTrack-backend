@@ -15,22 +15,6 @@ public class EmailService(IConfiguration config) : IEmailService
 {
     private async Task SendEmailAsync(string toEmail, string subject, string htmlBody)
     {
-        // // [B] Resend API (aktif)
-        // // Butuh di appsettings.json: "Email:From" dan "Email:ResendKey"
-        // using var http = new HttpClient();
-        // http.DefaultRequestHeaders.Authorization =
-        //     new System.Net.Http.Headers.AuthenticationHeaderValue(
-        //         "Bearer", config["Email:ResendKey"]!);
-        // var payload = new
-        // {
-        //     from    = config["Email:From"]!,
-        //     to      = new[] { toEmail },
-        //     subject = subject,
-        //     html    = htmlBody
-        // };
-        // var response = await http.PostAsJsonAsync("https://api.resend.com/emails", payload);
-        // response.EnsureSuccessStatusCode();
-
         // [A] SMTP Gmail — comment blok B, uncomment ini:
         var email = new MimeMessage();
         email.From.Add(MailboxAddress.Parse(config["Email:From"]!));

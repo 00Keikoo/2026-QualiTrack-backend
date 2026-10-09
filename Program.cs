@@ -6,10 +6,28 @@ using System.Text;
 using QualiTrack.Filters;
 using QualiTrack.Services;
 using System.Text.Json.Serialization;
+using DotNetEnv;
+
+Env.Load();
+Env.TraversePath().Load();
 
 AppContext.SetSwitch("Npgsql.EnableLegacyTimestampBehavior", true);
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Override JWT config dari environment variable
+var jwtKey = Environment.GetEnvironmentVariable("JWT_SECRET");
+if (!string.IsNullOrEmpty(jwtKey))
+{
+    builder.Configuration["Jwt:Key"] = jwtKey;
+}
+
+// Override Email config dari environment variable
+var oauthPw = Environment.GetEnvironmentVariable("OAUTH_PW");
+if (!string.IsNullOrEmpty(oauthPw))
+{
+    builder.Configuration["Email:Password"] = oauthPw;
+}
 
 //DATABASE
 var connectionString = builder.Configuration.GetConnectionString("Supabase")
@@ -55,6 +73,7 @@ builder.Services.AddScoped<QualiTrack.Services.IEmailService, QualiTrack.Service
 builder.Services.AddScoped<IQualityScoreService, QualityScoreService>();
 builder.Services.AddScoped<IKpiService, KpiService>();
 builder.Services.AddScoped<IRecentActivityService, RecentActivityService>();
+builder.Services.AddScoped<IAdminActivityService, AdminActivityService>();
 
 var isRailway = Environment.GetEnvironmentVariable("RAILWAY_ENVIRONMENT") != null;
 var useS3 = isRailway || builder.Configuration["Storage:UseS3"] == "true";

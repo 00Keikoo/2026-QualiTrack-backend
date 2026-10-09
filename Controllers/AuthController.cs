@@ -11,6 +11,7 @@ using QualiTrack.DTOs;
 using QualiTrack.Models;
 using QualiTrack.Services;
 using QualiTrack.Filters;
+using QualiTrack.Constants;
 
 namespace QualiTrack.Controllers;
 
@@ -19,6 +20,31 @@ namespace QualiTrack.Controllers;
 [ValidateModelAttribute]
 public class AuthController(AppDbContext db, IConfiguration config, IEmailService emailService) : ControllerBase
 {
+
+    private const int OtpExpiryMinutes = 5;
+    private const int ResetTokenExpiryMinutes = 10;
+    private const int OtpLength = 4;
+    private const int OtpMin = 1000;
+    private const int OtpMax = 9999;
+
+    private async Task GenerateAndSendOtpAsync(User user, string email)
+    {
+        var otp = GenerateSecureOtp();
+        user.OtpCode = BCrypt.Net.BCrypt.HashPassword(otp);
+        user.OtpExpiry = DateTime.UtcNow.AddMinutes(OtpExpiryMinutes);
+        await db.SaveChangesAsync();
+        await emailService.SendOtpAsync(email, otp);
+    }
+
+    private async Task GenerateAndSendRegistrationOtpAsync(User user, string email)
+    {
+        var otp = GenerateSecureOtp();
+        user.OtpCode = BCrypt.Net.BCrypt.HashPassword(otp);
+        user.OtpExpiry = DateTime.UtcNow.AddMinutes(OtpExpiryMinutes);
+        await db.SaveChangesAsync();
+        await emailService.SendRegistrationOtpAsync(email, otp);
+    }
+
     [HttpPost("register")]
     public async Task<IActionResult> Register(RegisterRequest req)
     {
@@ -34,21 +60,17 @@ public class AuthController(AppDbContext db, IConfiguration config, IEmailServic
             return BadRequest(new { message = "Password minimal 6 karakter" });
 
         var existingUser = await db.Users.FirstOrDefaultAsync(u => u.Email == req.Email);
-        if(existingUser != null)
+        if (existingUser != null)
         {
-            if(existingUser.EmailVerified)
-                return BadRequest(new { message = "Email sudah terdaftar"});
+            if (existingUser.EmailVerified)
+                return BadRequest(new { message = "Email sudah terdaftar" });
 
             // Daftar ulang sebelum verifikasi: pakai data terbaru dari form (termasuk role)
             existingUser.FullName = req.FullName;
             existingUser.Role = req.Role;
             existingUser.PasswordHash = BCrypt.Net.BCrypt.HashPassword(req.Password);
 
-            var newOtp = GenerateSecureOtp();
-            existingUser.OtpCode = BCrypt.Net.BCrypt.HashPassword(newOtp);
-            existingUser.OtpExpiry = DateTime.UtcNow.AddMinutes(5);
-            await db.SaveChangesAsync();
-            await emailService.SendRegistrationOtpAsync(existingUser.Email, newOtp);
+            await GenerateAndSendRegistrationOtpAsync(existingUser, existingUser.Email);
 
             return Ok(new
             {
@@ -56,9 +78,6 @@ public class AuthController(AppDbContext db, IConfiguration config, IEmailServic
                 email = existingUser.Email
             });
         }
-        
-
-        var otp = GenerateSecureOtp();
 
         var user = new User
         {
@@ -67,17 +86,17 @@ public class AuthController(AppDbContext db, IConfiguration config, IEmailServic
             Email = req.Email,
             PasswordHash = BCrypt.Net.BCrypt.HashPassword(req.Password),
             Role = req.Role,
-            Status = "Pending",
+            Status = UserStatus.Pending,
             EmailVerified = false,
-            OtpCode = BCrypt.Net.BCrypt.HashPassword(otp),
-            OtpExpiry = DateTime.UtcNow.AddMinutes(5),
+            OtpCode = null,
+            OtpExpiry = null,
             CreatedAt = DateTime.UtcNow
         };
 
         db.Users.Add(user);
         await db.SaveChangesAsync();
 
-        await emailService.SendRegistrationOtpAsync(user.Email, otp);
+        await GenerateAndSendRegistrationOtpAsync(user, user.Email);
 
         return Ok(new
         {
@@ -106,7 +125,7 @@ public class AuthController(AppDbContext db, IConfiguration config, IEmailServic
             return BadRequest(new { message = "OTP tidak valid" });
 
         user.EmailVerified = true;
-        user.Status = "Active";
+        user.Status = UserStatus.Active;
         user.OtpCode = null;
         user.OtpExpiry = null;
         await db.SaveChangesAsync();
@@ -124,12 +143,7 @@ public class AuthController(AppDbContext db, IConfiguration config, IEmailServic
         if (user.EmailVerified)
             return BadRequest(new { message = "Email sudah diverifikasi" });
 
-        var otp = GenerateSecureOtp();
-        user.OtpCode = BCrypt.Net.BCrypt.HashPassword(otp);
-        user.OtpExpiry = DateTime.UtcNow.AddMinutes(5);
-        await db.SaveChangesAsync();
-
-        await emailService.SendRegistrationOtpAsync(user.Email, otp);
+        await GenerateAndSendOtpAsync(user, user.Email);
 
         return Ok(new { message = "Kode OTP baru telah dikirim ke email kamu" });
 
@@ -143,7 +157,6 @@ public class AuthController(AppDbContext db, IConfiguration config, IEmailServic
         if (user is null || !BCrypt.Net.BCrypt.Verify(req.Password, user.PasswordHash))
             return Unauthorized(new { message = "Email atau password salah" });
 
-        // TODO akhir Sprint 2: aktifkan kembali setelah email service siap
         if (!user.EmailVerified)
             return Unauthorized(new { message = "Email belum diverifikasi. Cek inbox email kamu." });
 
@@ -161,44 +174,6 @@ public class AuthController(AppDbContext db, IConfiguration config, IEmailServic
             name = User.Identity != null ? User.Identity.Name : null,
             claims = User.Claims.Select(c => new { c.Type, c.Value })
         });
-    }
-
-    [HttpGet("auditors")]
-    [Authorize(Roles = "Admin,QualityManager")]
-    public async Task<IActionResult> GetAuditors()
-    {
-        var auditors = await db.Users
-            .Where(u => u.Role == UserRoles.AuditorInternal || u.Role == UserRoles.QualityManager)
-            .Select(u => new { u.Id, u.FullName, u.Role })
-            .ToListAsync();
-
-        return Ok(new { message = "Daftar AuditorInternal berhasil diambil", total = auditors.Count, data = auditors });
-    }
-
-    [HttpGet("users")]
-    [Authorize(Roles = "Admin,QualityManager")]
-    public async Task<IActionResult> GetUsers([FromQuery] string? role)
-    {
-        var query = db.Users.AsQueryable();
-
-        if (!string.IsNullOrEmpty(role))
-        {
-            var normalizedRole = role == UserRoles.AuditorInternal ? UserRoles.AuditorInternal : role;
-            if (normalizedRole == UserRoles.AuditorInternal)
-            {
-                query = query.Where(u => u.Role == UserRoles.AuditorInternal);
-            }
-            else
-            {
-                query = query.Where(u => u.Role == normalizedRole);
-            }
-        }
-
-        var users = await query
-            .Select(u => new { u.Id, u.FullName, u.Email, u.Role, u.Status })
-            .ToListAsync();
-
-        return Ok(new { message = "Daftar user berhasil diambil", total = users.Count, data = users });
     }
 
     [HttpPost("logout")]
@@ -221,20 +196,6 @@ public class AuthController(AppDbContext db, IConfiguration config, IEmailServic
         return Ok(new { message = "Password berhasil diubah" });
     }
 
-    [HttpPut("update-profile")]
-    [Authorize]
-    public async Task<IActionResult> UpdateProfile([FromBody] UpdateProfileRequest req)
-    {
-        var userId = Guid.Parse(User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)!.Value);
-        var user = await db.Users.FindAsync(userId);
-        if (user is null) return NotFound(new { message = "User tidak ditemukan" });
-
-        user.FullName = req.FullName;
-        await db.SaveChangesAsync();
-
-        return Ok(new { message = "Profil berhasil diupdate", data = new { user.FullName, user.Email } });
-    }
-
     [HttpPost("forgot-password/request-otp")]
     public async Task<IActionResult> RequestOtp([FromBody] RequestOtpRequest req)
     {
@@ -242,12 +203,7 @@ public class AuthController(AppDbContext db, IConfiguration config, IEmailServic
         if (user is null)
             return NotFound(new { message = "Email tidak ditemukan" });
 
-        var otp = GenerateSecureOtp();
-        user.OtpCode = BCrypt.Net.BCrypt.HashPassword(otp);
-        user.OtpExpiry = DateTime.UtcNow.AddMinutes(5);
-        await db.SaveChangesAsync();
-
-        await emailService.SendOtpAsync(user.Email, otp);
+        await GenerateAndSendOtpAsync(user, user.Email);
 
         return Ok(new { message = "Kode OTP telah dikirim ke email kamu" });
     }
@@ -270,7 +226,7 @@ public class AuthController(AppDbContext db, IConfiguration config, IEmailServic
 
         var resetToken = Guid.NewGuid().ToString();
         user.OtpCode = resetToken;
-        user.OtpExpiry = DateTime.UtcNow.AddMinutes(10);
+        user.OtpExpiry = DateTime.UtcNow.AddMinutes(ResetTokenExpiryMinutes);
         await db.SaveChangesAsync();
 
         return Ok(new { message = "OTP valid", resetToken = resetToken });
@@ -306,18 +262,6 @@ public class AuthController(AppDbContext db, IConfiguration config, IEmailServic
         return Ok(new { message = "Password berhasil direset, silakan login" });
     }
 
-    [HttpGet("pic-candidates")]
-    [Authorize]
-    public async Task<IActionResult> GetPicCandidates()
-    {
-        var pics = await db.Users
-            .Where(u => u.Status == "Active" && u.Role == "Auditee")
-            .Select(u => new { u.Id, u.FullName})
-            .ToListAsync();
-
-        return Ok(new { data = pics });
-    }
-
     [HttpPost("request-email-change-otp")]
     [Authorize]
     public async Task<IActionResult> RequestEmailChangeOtp([FromBody] RequestEmailChangeOtpRequest req)
@@ -329,13 +273,7 @@ public class AuthController(AppDbContext db, IConfiguration config, IEmailServic
         var emailTaken = await db.Users.AnyAsync(u => u.Email == req.NewEmail && u.Id != userId);
         if (emailTaken) return BadRequest(new { message = "Email sudah digunakan oleh akun lain" });
 
-        var otp = GenerateSecureOtp();
-        user.PendingEmail = req.NewEmail;
-        user.OtpCode = BCrypt.Net.BCrypt.HashPassword(otp);
-        user.OtpExpiry = DateTime.UtcNow.AddMinutes(5);
-        await db.SaveChangesAsync();
-
-        await emailService.SendOtpAsync(req.NewEmail, otp);
+        await GenerateAndSendOtpAsync(user, user.Email);
 
         return Ok(new { message = $"OTP telah dikirim ke {req.NewEmail}. Berlaku 5 menit." });
     }
@@ -396,92 +334,9 @@ public class AuthController(AppDbContext db, IConfiguration config, IEmailServic
     private static string GenerateSecureOtp()
     {
         using var rng = System.Security.Cryptography.RandomNumberGenerator.Create();
-        var bytes = new byte[4];
+        var bytes = new byte[OtpLength];
         rng.GetBytes(bytes);
         var value = BitConverter.ToUInt32(bytes, 0);
-        return (value % 9000 + 1000).ToString();
-    }
-
-    [HttpPost("upload-profile-photo")]
-    [Authorize]
-    public async Task<IActionResult> UploadProfilePhoto(IFormFile file)
-    {
-        if (file == null || file.Length == 0)
-            return BadRequest(new { message = "File tidak boleh kosong" });
-
-        var allowedTypes = new[] { "image/jpeg", "image/png", "image/jpg" };
-        if (!allowedTypes.Contains(file.ContentType))
-            return BadRequest(new { message = "file harus berupa gambar (jpg/png)" });
-
-        var userId = Guid.Parse(User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)!.Value);
-        var user = await db.Users.FindAsync(userId);
-        if (user is null)
-            return NotFound(new { message = "User tidak ditemukan" });
-
-        // Hapus foto lama kalau ada 
-        if (!string.IsNullOrEmpty(user.ProfilePhotoUrl))
-        {
-            var oldPath = Path.Combine("uploads", "profiles", Path.GetFileName(user.ProfilePhotoUrl));
-            if (System.IO.File.Exists(oldPath))
-                System.IO.File.Delete(oldPath);
-        }
-
-        // SImpan Foto baru
-        var uploadDir = Path.Combine("uploads", "profiles");
-        Directory.CreateDirectory(uploadDir);
-        var fileName = $"{userId}_{Guid.NewGuid()}{Path.GetExtension(file.FileName)}";
-        var filePath = Path.Combine(uploadDir, fileName);
-
-        using (var stream = new FileStream(filePath, FileMode.Create))
-            await file.CopyToAsync(stream);
-
-        user.ProfilePhotoUrl = $"/uploads/profiles/{fileName}";
-        await db.SaveChangesAsync();
-
-        return Ok(new { message = "Foto profil berhasil di upload", url = user.ProfilePhotoUrl });
-    }
-
-    [HttpDelete("profile-photo")]
-    [Authorize]
-    public async Task<IActionResult> RemoveProfilePhoto()
-    {
-        var userId = Guid.Parse(User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)!.Value);
-        var user = await db.Users.FindAsync(userId);
-        if (user is null)
-            return NotFound(new { message = "User tidak ditemukan" });
-
-        if (string.IsNullOrEmpty(user.ProfilePhotoUrl))
-            return BadRequest(new { message = "Tidak ada foto profil yang bisa dihapus" });
-
-        var filePath = Path.Combine("uploads", "profiles", Path.GetFileName(user.ProfilePhotoUrl));
-        if (!System.IO.File.Exists(filePath))
-            return NotFound(new { message = "File foto profil tidak ditemukan " });
-
-        System.IO.File.Delete(filePath);
-
-        user.ProfilePhotoUrl = null;
-        await db.SaveChangesAsync();
-
-        return Ok(new { message = "Foto profil berhasil dihapus" });
-    }
-
-    [HttpGet("profile")]
-    [Authorize]
-    public async Task<IActionResult> GetProfile()
-    {
-        var userId = Guid.Parse(User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)!.Value);
-        var user = await db.Users.FindAsync(userId);
-        if(user is null)
-            return NotFound(new { message = "User tidak ditemukan" });
-        
-        return Ok(new
-        {
-            user.Id,
-            user.FullName,
-            user.Email,
-            user.Role,
-            user.Status,
-            user.ProfilePhotoUrl
-        });
+        return (value % (OtpMax - OtpMin + 1)).ToString();
     }
 }
