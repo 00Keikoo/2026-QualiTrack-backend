@@ -321,4 +321,152 @@ public class AdminController(AppDbContext db, IAdminActivityService activityServ
 
         return Ok(new { message = $"ISO Standard berhasil {(isActive ? "diaktifkan" : "dinonaktifkan")}" });
     }
+
+    // ============================================================
+    // SPC UNIT MANAGEMENT
+    // ============================================================
+
+    // GET /api/admin/spc-units
+    [HttpGet("spc-units")]
+    public async Task<IActionResult> GetSpcUnits([FromQuery] bool? isActive)
+    {
+        var query = db.SpcUnits.AsNoTracking().AsQueryable();
+
+        if (isActive.HasValue)
+            query = query.Where(s => s.IsActive == isActive.Value);
+
+        var data = await query
+            .OrderByDescending(s => s.CreatedAt)
+            .Select(s => new SpcUnitDto
+            {
+                Id = s.Id,
+                Name = s.Name,
+                Symbol = s.Symbol,
+                Description = s.Description,
+                IsActive = s.IsActive,
+                CreatedAt = s.CreatedAt
+            })
+            .ToListAsync();
+
+        return Ok(new { total = data.Count, data });
+    }
+
+    // GET /api/admin/spc-units/{id}
+    [HttpGet("spc-units/{id}")]
+    public async Task<IActionResult> GetSpcUnitById(Guid id)
+    {
+        var unit = await db.SpcUnits
+            .AsNoTracking()
+            .FirstOrDefaultAsync(s => s.Id == id);
+
+        if (unit is null)
+            return NotFound(new { message = "SPC Unit tidak ditemukan" });
+
+        return Ok(new SpcUnitDto
+        {
+            Id = unit.Id,
+            Name = unit.Name,
+            Symbol = unit.Symbol,
+            Description = unit.Description,
+            IsActive = unit.IsActive,
+            CreatedAt = unit.CreatedAt
+        });
+    }
+
+    // POST /api/admin/spc-units
+    [HttpPost("spc-units")]
+    public async Task<IActionResult> CreateSpcUnit([FromBody] CreateSpcUnitRequest req)
+    {
+        var adminId = Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
+
+        // Cek duplikat symbol
+        var symbolExists = await db.SpcUnits.AnyAsync(s => s.Symbol == req.Symbol);
+        if (symbolExists)
+            return BadRequest(new { message = "Symbol unit sudah digunakan" });
+
+        var unit = new SpcUnit
+        {
+            Id = Guid.NewGuid(),
+            Name = req.Name,
+            Symbol = req.Symbol,
+            Description = req.Description,
+            IsActive = true,
+            CreatedAt = DateTime.UtcNow
+        };
+
+        db.SpcUnits.Add(unit);
+        await db.SaveChangesAsync();
+
+        await activityService.LogAsync(
+            adminId,
+            AdminActions.Create,
+            "SpcUnit",
+            unit.Name,
+            $"Menambahkan SPC Unit: {unit.Name} ({unit.Symbol})"
+        );
+
+        return CreatedAtAction(nameof(GetSpcUnitById), new { id = unit.Id }, new SpcUnitDto
+        {
+            Id = unit.Id,
+            Name = unit.Name,
+            Symbol = unit.Symbol,
+            Description = unit.Description,
+            IsActive = unit.IsActive,
+            CreatedAt = unit.CreatedAt
+        });
+    }
+
+    // PUT /api/admin/spc-units/{id}
+    [HttpPut("spc-units/{id}")]
+    public async Task<IActionResult> UpdateSpcUnit(Guid id, [FromBody] UpdateSpcUnitRequest req)
+    {
+        var adminId = Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
+
+        var unit = await db.SpcUnits.FindAsync(id);
+        if (unit is null)
+            return NotFound(new { message = "SPC Unit tidak ditemukan" });
+
+        // Cek duplikat symbol
+        var symbolExists = await db.SpcUnits.AnyAsync(s => s.Symbol == req.Symbol && s.Id != id);
+        if (symbolExists)
+            return BadRequest(new { message = "Symbol unit sudah digunakan" });
+
+        unit.Name = req.Name;
+        unit.Symbol = req.Symbol;
+        unit.Description = req.Description;
+        await db.SaveChangesAsync();
+
+        await activityService.LogAsync(
+            adminId,
+            AdminActions.Update,
+            "SpcUnit",
+            unit.Name,
+            $"Mengubah SPC Unit: {unit.Name} ({unit.Symbol})"
+        );
+
+        return Ok(new { message = "SPC Unit berhasil diupdate" });
+    }
+
+    // PATCH /api/admin/spc-units/{id}/status
+    [HttpPatch("spc-units/{id}/status")]
+    public async Task<IActionResult> UpdateSpcUnitStatus(Guid id, [FromBody] bool isActive)
+    {
+        var adminId = Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
+
+        var unit = await db.SpcUnits.FindAsync(id);
+        if (unit is null)
+            return NotFound(new { message = "SPC Unit tidak ditemukan" });
+
+        unit.IsActive = isActive;
+        await db.SaveChangesAsync();
+
+        var action = isActive ? AdminActions.Activate : AdminActions.Deactivate;
+        var description = isActive
+            ? $"Mengaktifkan SPC Unit: {unit.Name}"
+            : $"Menonaktifkan SPC Unit: {unit.Name}";
+
+        await activityService.LogAsync(adminId, action, "SpcUnit", unit.Name, description);
+
+        return Ok(new { message = $"SPC Unit berhasil {(isActive ? "diaktifkan" : "dinonaktifkan")}" });
+    }
 }
