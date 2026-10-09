@@ -15,6 +15,7 @@ public static class DbSeeder
                 Title = "ISO 9001 - Warehouse",
                 Standard = "ISO9001",
                 Department = "Warehouse",
+                IsSystemTemplate = true,
                 CreatedAt = DateTime.UtcNow,
                 Items =
                 [
@@ -33,6 +34,7 @@ public static class DbSeeder
                 Title = "ISO 14001 - Warehouse",
                 Standard = "ISO14001",
                 Department = "Warehouse",
+                IsSystemTemplate = true,
                 CreatedAt = DateTime.UtcNow,
                 Items =
                 [
@@ -51,6 +53,7 @@ public static class DbSeeder
                 Title = "GMP - Warehouse",
                 Standard = "GMP",
                 Department = "Warehouse",
+                IsSystemTemplate = true,
                 CreatedAt = DateTime.UtcNow,
                 Items =
                 [
@@ -69,6 +72,7 @@ public static class DbSeeder
                 Title = "ISO 9001 - Production",
                 Standard = "ISO9001",
                 Department = "Production",
+                IsSystemTemplate = true,
                 CreatedAt = DateTime.UtcNow,
                 Items =
                 [
@@ -87,6 +91,7 @@ public static class DbSeeder
                 Title = "ISO 14001 - Production",
                 Standard = "ISO14001",
                 Department = "Production",
+                IsSystemTemplate = true,
                 CreatedAt = DateTime.UtcNow,
                 Items =
                 [
@@ -105,6 +110,7 @@ public static class DbSeeder
                 Title = "GMP - Production",
                 Standard = "GMP",
                 Department = "Production",
+                IsSystemTemplate = true,
                 CreatedAt = DateTime.UtcNow,
                 Items =
                 [
@@ -123,6 +129,7 @@ public static class DbSeeder
                 Title = "ISO 9001 - QC",
                 Standard = "ISO9001",
                 Department = "QC",
+                IsSystemTemplate = true,
                 CreatedAt = DateTime.UtcNow,
                 Items =
                 [
@@ -141,6 +148,7 @@ public static class DbSeeder
                 Title = "ISO 14001 - QC",
                 Standard = "ISO14001",
                 Department = "QC",
+                IsSystemTemplate = true,
                 CreatedAt = DateTime.UtcNow,
                 Items =
                 [
@@ -159,6 +167,7 @@ public static class DbSeeder
                 Title = "GMP - QC",
                 Standard = "GMP",
                 Department = "QC",
+                IsSystemTemplate  = true,
                 CreatedAt = DateTime.UtcNow,
                 Items =
                 [
@@ -177,6 +186,7 @@ public static class DbSeeder
                 Title = "ISO 9001 - Packaging",
                 Standard = "ISO9001",
                 Department = "Packaging",
+                IsSystemTemplate = true,
                 CreatedAt = DateTime.UtcNow,
                 Items =
                 [
@@ -195,6 +205,7 @@ public static class DbSeeder
                 Title = "ISO 14001 - Packaging",
                 Standard = "ISO14001",
                 Department = "Packaging",
+                IsSystemTemplate = true,
                 CreatedAt = DateTime.UtcNow,
                 Items =
                 [
@@ -213,6 +224,7 @@ public static class DbSeeder
                 Title = "GMP - Packaging",
                 Standard = "GMP",
                 Department = "Packaging",
+                IsSystemTemplate = true,
                 CreatedAt = DateTime.UtcNow,
                 Items =
                 [
