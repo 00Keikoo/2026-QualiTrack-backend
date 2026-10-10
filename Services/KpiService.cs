@@ -25,10 +25,11 @@ public class KpiService(AppDbContext db) : IKpiService
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
 
         var userCapas = await db.CAPAs
+            .Include(c => c.Status)
             .Where(c => c.PicId == userId)
             .ToListAsync();
 
-        var closedCapas = userCapas.Where(c => c.Status == CAPAStatus.Closed).ToList();
+        var closedCapas = userCapas.Where(c => c.Status.IsTerminal).ToList();
 
         var closedOnTime = closedCapas.Count(c =>
             c.ClosedAt.HasValue &&
@@ -40,7 +41,7 @@ public class KpiService(AppDbContext db) : IKpiService
 
         // Belum selesai & deadline sudah lewat
         var stalled = userCapas.Count(c =>
-            c.Status != CAPAStatus.Closed &&
+            !c.Status.IsTerminal &&
             c.Deadline < today);
 
         var totalFindingReported = await db.Findings

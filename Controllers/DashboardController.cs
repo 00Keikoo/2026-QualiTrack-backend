@@ -27,10 +27,12 @@ public class DashboardController(AppDbContext db) : ControllerBase
             .CountAsync();
 
         var capaOpen = await db.CAPAs
-            .CountAsync(c => c.Status == CAPAStatus.Open || c.Status == CAPAStatus.InProgress);
-
+            .Include(c => c.Status)
+            .CountAsync(c => !c.Status.IsTerminal);
+            
         var capaOverdue = await db.CAPAs
-            .CountAsync(c => c.Deadline < today && c.Status != CAPAStatus.Closed);
+            .Include(c => c.Status)
+            .CountAsync(c => c.Deadline < today && !c.Status.IsTerminal);
 
         return Ok(new
         {
@@ -192,12 +194,14 @@ public class DashboardController(AppDbContext db) : ControllerBase
         // Findings bulan ini
         var sessionIds = sessions.Select(s => s.Id).ToList();
         var findings = await db.Findings
+            .Include(f => f.Category)
             .Where(f => f.SessionId.HasValue && sessionIds.Contains(f.SessionId.Value))
             .ToListAsync();
 
         // CAPA bulan ini
         var findingIds = findings.Select(f => f.Id).ToList();
         var capas = await db.CAPAs
+            .Include(c => c.Status)
             .Where(c => findingIds.Contains(c.FindingId))
             .ToListAsync();
 
@@ -225,8 +229,8 @@ public class DashboardController(AppDbContext db) : ControllerBase
                 complianceScore,
                 totalFindings = findings.Count,
                 totalCapa = capas.Count,
-                capaOpen = capas.Count(c => c.Status == CAPAStatus.Open),
-                capaOverdue = capas.Count(c => c.Deadline < today && c.Status != CAPAStatus.Closed)
+                capaOpen = capas.Count(c => c.Status.IsTerminal),
+                capaOverdue = capas.Count(c => c.Deadline < today && !c.Status.IsTerminal)
             },
             schedules = schedules.Select(s =>
             {
@@ -245,9 +249,9 @@ public class DashboardController(AppDbContext db) : ControllerBase
                     status = session == null ? "NotStarted" : session.Status.ToString(),
                     sessionId = session?.Id,
                     totalFindings = sessionFindings.Count,
-                    majorNC = sessionFindings.Count(f => f.Category == FindingCategory.MajorNC),
-                    minorNC = sessionFindings.Count(f => f.Category == FindingCategory.MinorNC),
-                    observation = sessionFindings.Count(f => f.Category == FindingCategory.Observation)
+                    majorNC = sessionFindings.Count(f => f.Category.Name == "Major NC"),
+                    minorNC = sessionFindings.Count(f => f.Category.Name == "Minor NC"),
+                    observation = sessionFindings.Count(f => f.Category.Name == "Observation")
                 };
             })
         });

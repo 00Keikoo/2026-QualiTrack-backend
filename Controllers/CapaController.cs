@@ -17,7 +17,7 @@ public class CapaController(AppDbContext db) : ControllerBase
 {
     [HttpGet]
     [Authorize(Roles = "Admin,QualityManager,AuditorInternal,Auditee")]
-    public async Task<IActionResult> GetAll([FromQuery] CAPAStatus? status)
+    public async Task<IActionResult> GetAll([FromQuery] string? statusName)
     {
         var query = db.CAPAs
             .Include(c => c.Actions)
@@ -26,9 +26,12 @@ public class CapaController(AppDbContext db) : ControllerBase
                 .ThenInclude(co => co!.VerifiedBy)
             .Include(c => c.Pic)
             .Include(c => c.Finding)
+                .ThenInclude(f => f.Category!)
+            .Include(c => c.Status)
             .AsQueryable();
 
-        if (status.HasValue) query = query.Where(c => c.Status == status);
+        if (!string.IsNullOrEmpty(statusName))
+            query = query.Where(c => c.Status.Name == statusName);
 
         if (User.IsInRole("Auditee"))
         {
@@ -47,10 +50,12 @@ public class CapaController(AppDbContext db) : ControllerBase
     {
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
         var query = db.CAPAs
-            .Where(c => c.Deadline < today && c.Status != CAPAStatus.Closed)
+            .Where(c => c.Deadline < today && !c.Status.IsTerminal)
             .Include(c => c.Actions)
             .Include(c => c.Pic)
+            .Include(c => c.Status)
             .Include(c => c.Finding)
+                .ThenInclude(f => f.Category!)
             .AsQueryable();
 
         if (User.IsInRole("Auditee"))
@@ -72,7 +77,9 @@ public class CapaController(AppDbContext db) : ControllerBase
             .Include(c => c.Actions)
             .Include(c => c.CloseOut)
             .Include(c => c.Pic)
+            .Include(c => c.Status)
             .Include(c => c.Finding)
+                .ThenInclude(f => f.Category!)
             .FirstOrDefaultAsync(c => c.Id == id);
 
         if (capa is null) return NotFound(new { message = "CAPA tidak ditemukan"});
@@ -108,6 +115,12 @@ public class CapaController(AppDbContext db) : ControllerBase
             req.PicId = user.Id;
         }
 
+        var openStatus = await db.CapaStatuses
+            .FirstOrDefaultAsync(s => s.Name == "Open" && s.IsActive);
+
+        if (openStatus == null)
+            return BadRequest(new { message = "Status 'Open' tidak ditemukan" });
+        
         var capa = new CAPA
         {
             Id = Guid.NewGuid(),
@@ -117,7 +130,7 @@ public class CapaController(AppDbContext db) : ControllerBase
             PreventiveAction = req.PreventiveAction,
             PicId = req.PicId.Value,
             Deadline = req.Deadline.Value,
-            Status = CAPAStatus.Open,
+            StatusId = openStatus.Id,
             CreatedAt = DateTime.UtcNow
         };
 
@@ -128,6 +141,9 @@ public class CapaController(AppDbContext db) : ControllerBase
         var createdCapa = await db.CAPAs
             .Include(c => c.Actions)
             .Include(c => c.Pic)
+            .Include(c => c.Status)
+            .Include(c => c.Finding)
+                .ThenInclude(f => f.Category!)
             .FirstOrDefaultAsync(c => c.Id == capa.Id);
 
         if (createdCapa is null)
@@ -166,22 +182,31 @@ public class CapaController(AppDbContext db) : ControllerBase
 
     [HttpPatch("{id}/status")]
     [Authorize(Roles = "Admin,QualityManager,AuditorInternal,Auditee")]
-    public async Task<IActionResult> UpdateStatus(Guid id, [FromBody] CAPAStatus status)
+    public async Task<IActionResult> UpdateStatus(Guid id, [FromBody] Guid statusId)
     {
-        var capa = await db.CAPAs.Include(c => c.CloseOut).FirstOrDefaultAsync(c => c.Id == id);
-        if (capa is null) return NotFound(new { message = "CAPA tidak ditemukan"});
+        var capa = await db.CAPAs
+            .Include(c => c.CloseOut)
+            .FirstOrDefaultAsync(c => c.Id == id);
+        if (capa is null) 
+            return NotFound(new { message = "CAPA tidak ditemukan"});
         if (User.IsInRole("Auditee"))
         {
             var userId = Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
             if (capa.PicId != userId) return Forbid();
         }
 
-        if (capa.Status == CAPAStatus.Closed && capa.CloseOut != null)
-            return BadRequest(new { message = "CAPA yang sudah ditutup dan terverifikasi tidak dapat diubah statusnya secara manual" });
-            
-        capa.Status = status;
+        if (capa.Status.IsTerminal && capa.CloseOut != null)
+            return BadRequest(new { message = "CAPA yang sudah ditutup dan terverifikasi tidak dapat diubah statusnya" });
+
+        // Validate new status exists and active
+        var newStatus = await db.CapaStatuses.FindAsync(statusId);
+        if (newStatus == null || !newStatus.IsActive)
+            return BadRequest(new { message = "Status tidak valid" });
+
+        capa.StatusId = statusId;
         await db.SaveChangesAsync();
-        return NoContent();
+
+        return Ok(new { message = "Status CAPA berhasil diupdate" });
     }
 
     [HttpPost("{id}/actions")]
@@ -208,8 +233,13 @@ public class CapaController(AppDbContext db) : ControllerBase
         };
 
         db.CAPAActions.Add(action);
-        if (capa.Status != CAPAStatus.Closed)
-            capa.Status = CAPAStatus.InProgress;
+        if (!capa.Status.IsTerminal)
+        {
+            var inProgressStatus = await db.CapaStatuses
+                .FirstOrDefaultAsync(s => s.Name == "InProgress");
+            if (inProgressStatus != null)
+                capa.StatusId = inProgressStatus.Id;
+        }
         await db.SaveChangesAsync();
 
         var doneBy = await db.Users.FindAsync(req.DoneById.Value);
@@ -253,7 +283,14 @@ public class CapaController(AppDbContext db) : ControllerBase
         };
 
         db.CloseOutVerifications.Add(verification);
-        capa.Status = CAPAStatus.Closed;
+
+        var closedStatus = await db.CapaStatuses
+            .FirstOrDefaultAsync(s => s.IsTerminal == true);
+
+        if (closedStatus == null)
+            return BadRequest(new { message = "Status closed tidak ditemukan" });
+
+        capa.StatusId = closedStatus.Id;
         capa.ClosedAt = DateTime.UtcNow;
 
         await db.Findings
@@ -296,13 +333,13 @@ public class CapaController(AppDbContext db) : ControllerBase
             FindingTitle = capa.Finding != null
                 ? (string.IsNullOrEmpty(capa.Finding.ClauseRef) ? capa.Finding.Title : $"{capa.Finding.ClauseRef} - {capa.Finding.Title}")
                     : string.Empty,
-            FindingCategory = capa.Finding != null ? capa.Finding.Category.ToString() : string.Empty,
-
+            FindingCategory = capa.Finding?.Category?.Name ?? string.Empty,
             RootCause = capa.RootCause,
             CorrectiveAction = capa.CorrectiveAction,
             PreventiveAction = capa.PreventiveAction,
             Deadline = capa.Deadline,
-            Status = capa.Status,
+            StatusId = capa.StatusId,
+            StatusName = capa.Status?.Name ?? string.Empty,
             PicId = capa.PicId,
             PicName = capa.Pic?.FullName,
             CreatedAt = capa.CreatedAt,

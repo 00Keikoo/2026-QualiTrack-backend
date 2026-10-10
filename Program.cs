@@ -74,6 +74,7 @@ builder.Services.AddScoped<IQualityScoreService, QualityScoreService>();
 builder.Services.AddScoped<IKpiService, KpiService>();
 builder.Services.AddScoped<IRecentActivityService, RecentActivityService>();
 builder.Services.AddScoped<IAdminActivityService, AdminActivityService>();
+builder.Services.AddScoped<ConfigService>();
 
 var isRailway = Environment.GetEnvironmentVariable("RAILWAY_ENVIRONMENT") != null;
 var useS3 = isRailway || builder.Configuration["Storage:UseS3"] == "true";

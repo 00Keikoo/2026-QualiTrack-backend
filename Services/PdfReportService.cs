@@ -183,7 +183,7 @@ public class PdfReportService(IStorageService storage, IWebHostEnvironment env, 
 
             // ===== EVIDENCE DOCUMENTATION =====
             var passResponses = responses.Where(r => r.Answer == ResponseAnswer.Conform && r.Evidences != null && r.Evidences.Any()).ToList();
-            var failFindings = findings.Where(f => f.Category == FindingCategory.MajorNC || f.Category == FindingCategory.MinorNC || f.Category == FindingCategory.OFI).ToList();
+            var failFindings = findings.Where(f => f.Category.Name == "MajorNC" || f.Category.Name == "MinorNC" || f.Category.Name == "OFI").ToList();
 
             if (passResponses.Any() || failFindings.Any())
             {

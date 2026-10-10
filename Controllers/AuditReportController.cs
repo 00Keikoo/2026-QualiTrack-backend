@@ -13,7 +13,7 @@ namespace QualiTrack.Controllers;
 public class AuditReportController(AppDbContext db) : ControllerBase
 {
     [HttpGet]
-    
+
     public async Task<IActionResult> GetAll(
         [FromQuery] string? standard,
         [FromQuery] string? department,
@@ -21,10 +21,16 @@ public class AuditReportController(AppDbContext db) : ControllerBase
     {
         var sessions = await db.AuditSessions
             .Where(s => s.Status == AuditSessionStatus.Completed)
-            .Include(s => s.Schedule).ThenInclude(sch => sch.AuditPlan)
-            .Include(s => s.Schedule).ThenInclude(sch => sch.Auditor)
+            .Include(s => s.Schedule)
+                .ThenInclude(sch => sch.AuditPlan)
+            .Include(s => s.Schedule)
+                .ThenInclude(sch => sch.Auditor)
             .Include(s => s.Summary)
-            .Include(s => s.Findings).ThenInclude(f => f.Capa)
+            .Include(s => s.Findings)
+                .ThenInclude(f => f.Category!)
+            .Include(s => s.Findings)
+                .ThenInclude(f => f.Capa)
+                    .ThenInclude(c => c.Status!)
             .ToListAsync();
 
         if (!string.IsNullOrEmpty(standard))
@@ -48,10 +54,10 @@ public class AuditReportController(AppDbContext db) : ControllerBase
             CompletedAt = s.CompletedAt,
             SummaryContent = s.Summary?.Content,
             TotalFindings = s.Findings.Count,
-            TotalMajorNC = s.Findings.Count(f => f.Category == FindingCategory.MajorNC),
-            TotalMinorNC = s.Findings.Count(f => f.Category == FindingCategory.MinorNC),
+            TotalMajorNC = s.Findings.Count(f => f.Category.Name == "MajorNC"),
+            TotalMinorNC = s.Findings.Count(f => f.Category.Name == "MinorNC"),
             TotalCAPAs = s.Findings.Count(f => f.Capa != null),
-            ClosedCAPAs = s.Findings.Count(f => f.Capa != null && f.Capa.Status == CAPAStatus.Closed)
+            ClosedCAPAs = s.Findings.Count(f => f.Capa != null && f.Capa.Status.IsTerminal)
         }).OrderByDescending(r => r.CompletedAt).ToList();
 
         return Ok(new { message = "Data laporan audit berhasil diambil", total = result.Count, data = result });
@@ -91,10 +97,10 @@ public class AuditReportController(AppDbContext db) : ControllerBase
             {
                 Id = f.Id,
                 Title = f.Title,
-                Category = f.Category.ToString(),
+                Category = f.Category.Name,
                 Description = f.Description,
                 ClauseRef = f.ClauseRef,
-                Status = f.Status.ToString(),
+                Status = f.Status!.ToString(),
                 FoundAt = f.FoundAt,
                 Capa = f.Capa == null ? null : new CapaReportDto
                 {
@@ -104,7 +110,7 @@ public class AuditReportController(AppDbContext db) : ControllerBase
                     PreventiveAction = f.Capa.PreventiveAction,
                     PicName = f.Capa.Pic?.FullName ?? string.Empty,
                     Deadline = f.Capa.Deadline.ToString("yyyy-MM-dd"),
-                    Status = f.Capa.Status.ToString()
+                    Status = f.Capa.Status.Name
                 }
             }).ToList()
         };

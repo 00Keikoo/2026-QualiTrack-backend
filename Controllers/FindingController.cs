@@ -18,13 +18,17 @@ public class FindingController(AppDbContext db) : ControllerBase
     [Authorize(Roles = "Admin,QualityManager,AuditorInternal,Auditee")]
     public async Task<IActionResult> GetAll(
         [FromQuery] FindingStatus? status,
-        [FromQuery] FindingCategory? category,
+        [FromQuery] string? categoryName,
         [FromQuery] DateTime? from,
         [FromQuery] DateTime? to)
     {
-        var query = db.Findings.Include(f => f.Reporter).AsQueryable();
+        var query = db.Findings
+            .Include(f => f.Category)
+            .Include(f => f.Reporter)
+            .AsQueryable();
         if (status.HasValue) query = query.Where(f => f.Status == status);
-        if (category.HasValue) query = query.Where(f => f.Category == category);
+        if (!string.IsNullOrEmpty(categoryName))
+            query = query.Where(f => f.Category.Name == categoryName);
         if (from.HasValue) query = query.Where(f => f.FoundAt >= from.Value);
         if (to.HasValue) query = query.Where(f => f.FoundAt <= to.Value);
         return Ok(await query.ToListAsync());
@@ -86,6 +90,12 @@ public class FindingController(AppDbContext db) : ControllerBase
             reporterName = reporter?.FullName ?? string.Empty;
         }
 
+        var minorCategory = await db.FindingCategories
+            .FirstOrDefaultAsync(c => c.Name == "Minor NC" && c.IsActive);
+
+        if (minorCategory == null)
+            return BadRequest(new { message = "Category 'Minor NC' tidak ditemukan" });
+
         var finding = new Finding
         {
             Id = Guid.NewGuid(),
@@ -95,7 +105,7 @@ public class FindingController(AppDbContext db) : ControllerBase
             ChecklistItemId = req.ChecklistItemId,
             ReporterName = reporterName,
             ReporterId = req.ReporterId,
-            Category = req.Category ?? FindingCategory.MinorNC,
+            CategoryId = minorCategory.Id,
             Description = req.Description,
             ClauseRef = req.ClauseRef,
             FoundAt = DateTime.UtcNow,

@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using QualiTrack.Models;
 using QualiTrack.DTOs;
+using Amazon.S3.Model;
 
 namespace QualiTrack.Data;
 
@@ -28,6 +29,10 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<SpcUnit> SpcUnits => Set<SpcUnit>();
     public DbSet<IsoStandard> IsoStandards => Set<IsoStandard>();
     public DbSet<AdminActivityLog> AdminActivityLogs => Set<AdminActivityLog>();
+    public DbSet<FindingCategory> FindingCategories => Set<FindingCategory>();
+    public DbSet<CapaStatus> CapaStatuses => Set<CapaStatus>();
+    public DbSet<SystemConfig> SystemConfigs => Set<SystemConfig>();
+    
 
     protected override void OnModelCreating(ModelBuilder mb)
     {
@@ -41,14 +46,27 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             .WithOne(v => v.Capa)
             .HasForeignKey<CloseOutVerification>(v => v.CapaId);
 
-        mb.Entity<Finding>().Property(f => f.Category).HasConversion<string>();
         mb.Entity<Finding>().Property(f => f.Status).HasConversion<string>();
-        mb.Entity<CAPA>().Property(c => c.Status).HasConversion<string>();
-        mb.Entity<AuditSession>().Property(s => s.Status).HasConversion<string>();
-        mb.Entity<AuditResponse>().Property(r => r.Answer).HasConversion<string>();
+
+        mb.Entity<Finding>()
+            .HasOne(f => f.Category)
+            .WithMany(c => c.Findings)
+            .HasForeignKey(f => f.CategoryId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        mb.Entity<CAPA>()
+            .HasOne(c => c.Status)
+            .WithMany(s => s.Capas)
+            .HasForeignKey(c => c.StatusId)
+            .OnDelete(DeleteBehavior.Restrict);
 
         mb.Entity<Finding>().HasIndex(f => f.Status);
-        mb.Entity<CAPA>().HasIndex(c => new { c.Status, c.Deadline });
+        mb.Entity<Finding>().HasIndex(f => f.CategoryId);
+        mb.Entity<CAPA>().HasIndex(c => new { c.StatusId, c.Deadline });
+        mb.Entity<CAPA>().HasIndex(c => c.StatusId);
+
+        mb.Entity<AuditSession>().Property(s => s.Status).HasConversion<string>();
+        mb.Entity<AuditResponse>().Property(r => r.Answer).HasConversion<string>();
         mb.Entity<AuditSession>().HasIndex(s => s.ScheduleId);
         mb.Entity<AuditSession>().HasIndex(s => new { s.Status, s.CompletedAt });
 
@@ -84,6 +102,10 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
 
         // IsoStandard code harus unik
         mb.Entity<IsoStandard>().HasIndex(i => i.Code).IsUnique();
-        mb.Entity<SpcUnit>().HasIndex(s => s.Name).IsUnique();  
+        mb.Entity<SpcUnit>().HasIndex(s => s.Name).IsUnique();
+
+        mb.Entity<FindingCategory>().HasIndex(c => c.Name).IsUnique();
+        mb.Entity<CapaStatus>().HasIndex(s => s.Name).IsUnique();
+        mb.Entity<SystemConfig>().HasIndex(c => c.Key).IsUnique();
     }
 }

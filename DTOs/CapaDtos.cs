@@ -76,7 +76,8 @@ public class CAPAResponseDto
     public string CorrectiveAction { get; set; } = string.Empty;
     public string? PreventiveAction { get; set; }
     public DateOnly Deadline { get; set; }
-    public CAPAStatus Status { get; set; }
+    public Guid StatusId { get; set; }
+    public string StatusName { get; set; } = string.Empty;
     public Guid? PicId { get; set; }
     public string? PicName { get; set; }
     public DateTime CreatedAt { get; set; }
