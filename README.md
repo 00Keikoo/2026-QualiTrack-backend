@@ -179,6 +179,24 @@ Auth header: `Authorization: Bearer {token}`
 | GET | `/audit-schedule` | Jadwal audit bulanan | ✅ |
 | GET | `/monthly-report` | Laporan bulanan | ✅ |
 
+### 📈 Quality Scores — `/api/quality-scores`
+
+| Method | Endpoint | Deskripsi | Auth |
+|---|---|---|---|
+| GET | `/trend?year=2026` | Quality trend per bulan (yearly) | ✅ |
+| GET | `/department-trend?timeframe=all` | Compliance trend per department dengan perbandingan month-over-month | ✅ |
+| GET | `/overall-trend?timeframe=all` | Overall compliance trend | ✅ |
+
+**Query Parameters untuk `/department-trend`:**
+- `timeframe`: `all`, `3m`, `6m`, `1y` (default: `all`)
+
+**Response `/department-trend` includes:**
+- `previousScore`: Score bulan sebelumnya
+- `difference`: Selisih dengan bulan lalu
+- `trend`: Indicator `"up"`, `"down"`, atau `"stable"`
+
+```
+
 ### 📄 Audit Report — `/api/AuditReport`
 
 | Method | Endpoint | Deskripsi | Auth |
@@ -191,6 +209,34 @@ Auth header: `Authorization: Bearer {token}`
 | Method | Endpoint | Deskripsi | Auth |
 |---|---|---|---|
 | GET | `/audit-report/{sessionId}` | Generate & download PDF laporan audit | ✅ |
+
+### ⚙️ System Configuration — `/api/system-config`
+
+| Method | Endpoint | Deskripsi | Auth |
+|---|---|---|---|
+| GET | `/timezone` | Get timezone config | ✅ Admin |
+| PUT | `/timezone` | Update timezone | ✅ Admin |
+| GET | `/date-format` | Get date format config | ✅ Admin |
+| PUT | `/date-format` | Update date format | ✅ Admin |
+| GET | `/finding-categories` | List finding categories | ✅ Admin |
+| POST | `/finding-categories` | Create finding category | ✅ Admin |
+| PUT | `/finding-categories/{id}` | Update finding category | ✅ Admin |
+| DELETE | `/finding-categories/{id}` | Delete finding category | ✅ Admin |
+| GET | `/capa-statuses` | List CAPA statuses | ✅ Admin |
+| POST | `/capa-statuses` | Create CAPA status | ✅ Admin |
+| PUT | `/capa-statuses/{id}` | Update CAPA status | ✅ Admin |
+| DELETE | `/capa-statuses/{id}` | Delete CAPA status | ✅ Admin |
+
+### 🏢 Department Management — `/api/departments`
+
+| Method | Endpoint | Deskripsi | Auth |
+|---|---|---|---|
+| GET | `/` | List all departments | ✅ Admin |
+| GET | `/{id}` | Get department by ID | ✅ Admin |
+| POST | `/` | Create department | ✅ Admin |
+| PUT | `/{id}` | Update department | ✅ Admin |
+| PATCH | `/{id}/status` | Toggle active/inactive | ✅ Admin |
+| DELETE | `/{id}` | Delete department | ✅ Admin |
 
 ### ❤️ Health Check — `/api/Health`
 
@@ -220,7 +266,6 @@ request-email-change-otp → verify-email-change
 |---|---|
 | `Admin` | Akses penuh |
 | `QualityManager` | Kelola audit plan, lihat semua data |
-| `Auditor` | Jalankan sesi audit, catat finding |
 | `AuditorInternal` | Auditor internal |
 | `Auditee` | Pihak yang diaudit |
 
