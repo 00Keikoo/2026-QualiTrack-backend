@@ -245,7 +245,7 @@ namespace QualiTrack.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
-                    b.Property<Guid>("StatusId")
+                    b.Property<Guid?>("StatusId")
                         .HasColumnType("uuid");
 
                     b.HasKey("Id");
@@ -298,6 +298,12 @@ namespace QualiTrack.Migrations
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp without time zone");
+
+                    b.Property<DateTime?>("DeleteAt")
+                        .HasColumnType("timestamp without time zone");
+
+                    b.Property<Guid?>("DeletedById")
+                        .HasColumnType("uuid");
 
                     b.Property<string>("Description")
                         .IsRequired()
@@ -513,7 +519,7 @@ namespace QualiTrack.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
-                    b.Property<Guid>("CategoryId")
+                    b.Property<Guid?>("CategoryId")
                         .HasColumnType("uuid");
 
                     b.Property<Guid?>("ChecklistItemId")
@@ -573,6 +579,12 @@ namespace QualiTrack.Migrations
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp without time zone");
+
+                    b.Property<DateTime>("DeleteAt")
+                        .HasColumnType("timestamp without time zone");
+
+                    b.Property<Guid?>("DeletedById")
+                        .HasColumnType("uuid");
 
                     b.Property<string>("Description")
                         .IsRequired()
@@ -905,8 +917,7 @@ namespace QualiTrack.Migrations
                     b.HasOne("QualiTrack.Models.CapaStatus", "Status")
                         .WithMany("Capas")
                         .HasForeignKey("StatusId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
+                        .OnDelete(DeleteBehavior.Restrict);
 
                     b.Navigation("Finding");
 
@@ -999,8 +1010,7 @@ namespace QualiTrack.Migrations
                     b.HasOne("QualiTrack.Models.FindingCategory", "Category")
                         .WithMany("Findings")
                         .HasForeignKey("CategoryId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
+                        .OnDelete(DeleteBehavior.Restrict);
 
                     b.HasOne("QualiTrack.Models.User", "Reporter")
                         .WithMany()

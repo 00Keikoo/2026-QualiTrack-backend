@@ -9,6 +9,8 @@ public class CapaStatus
     public bool IsTerminal { get; set; }
     public bool IsActive { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime? DeleteAt { get; set; }
+    public Guid? DeletedById { get; set; }
 
     public ICollection<CAPA> Capas { get; set; } = [];
 }

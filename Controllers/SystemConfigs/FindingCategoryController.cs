@@ -5,7 +5,7 @@ using QualiTrack.Data;
 using QualiTrack.DTOs.SystemConfigs;
 using QualiTrack.Models;
 
-namespace QualiTrack.Controllers.SystemConfig;
+namespace QualiTrack.Controllers.SystemConfigs;
 
 [ApiController]
 [Route("api/system-config/finding-categories")]
@@ -18,6 +18,8 @@ public class FindingCategoryController(AppDbContext db) : ControllerBase
     public async Task<IActionResult> GetFindingCategories()
     {
         var categories = await _db.FindingCategories
+            .Where(c => c.IsActive)
+            .Include(c => c.Findings)
             .AsNoTracking()
             .OrderBy(c => c.Severity)
             .Select(c => new FindingCategoryResponseDto

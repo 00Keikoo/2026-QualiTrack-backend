@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using QualiTrack.Data;
 using QualiTrack.DTOs.SystemConfigs;
 using QualiTrack.Models;
+using QualiTrack.Constants;
 
 namespace QualiTrack.Controllers.SystemConfigs;
 
@@ -19,6 +20,7 @@ public class CapaStatusController(AppDbContext db) : ControllerBase
     public async Task<IActionResult> GetCapaStatuses()
     {
         var statuses = await _db.CapaStatuses
+            .Include(s => s.Capas)
             .AsNoTracking()
             .OrderBy(s => s.OrderIndex)
             .Select(s => new CapaStatusResponseDto

@@ -12,5 +12,5 @@ public class UpdateTimeZoneDto
 public class TimeZoneResponseDto
 {
     public string TimeZone { get; set; } = string.Empty;
-    public DateTime UpdatedAt { get; set; }
+    public DateTime? UpdatedAt { get; set; }
 }

@@ -7,8 +7,9 @@ public class ConfigService
 {
     private readonly AppDbContext _db;
     private string? _cachedTimeZone;
+    private DateTime _timeZoneCacheExpiry;
     private string? _cachedDateFormat;
-    private DateTime _cacheExpiry;
+    private DateTime _dateFormatCacheExpiry;
 
     public ConfigService(AppDbContext db)
     {
@@ -17,12 +18,12 @@ public class ConfigService
 
     public async Task<string> GetTimeZoneAsync()
     {
-        if (_cachedTimeZone == null || DateTime.UtcNow > _cacheExpiry)
+        if (_cachedTimeZone == null || DateTime.UtcNow > _timeZoneCacheExpiry)
         {
             var config = await _db.SystemConfigs
                 .FirstOrDefaultAsync(c => c.Key == "TimeZone");
             _cachedTimeZone = config?.Value ?? "Asia/Jakarta";
-            _cacheExpiry = DateTime.UtcNow.AddMinutes(5); // Cache 5 Menit
+            _timeZoneCacheExpiry = DateTime.UtcNow.AddMinutes(5);
         }
 
         return _cachedTimeZone;
@@ -30,7 +31,7 @@ public class ConfigService
 
     public async Task<string> GetDateFormatAsync()
     {
-        if (_cachedDateFormat == null || DateTime.UtcNow > _cacheExpiry)
+        if (_cachedDateFormat == null || DateTime.UtcNow > _dateFormatCacheExpiry)
         {
             var config = await _db.SystemConfigs
                 .FirstOrDefaultAsync(c => c.Key == "DateFormat");

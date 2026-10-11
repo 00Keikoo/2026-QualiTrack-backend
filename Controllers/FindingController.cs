@@ -5,6 +5,7 @@ using QualiTrack.Data;
 using QualiTrack.DTOs;
 using QualiTrack.Filters;
 using QualiTrack.Models;
+using QualiTrack.Constants;
 
 namespace QualiTrack.Controllers;
 
@@ -68,9 +69,16 @@ public class FindingController(AppDbContext db) : ControllerBase
             total = findings.Count,
             data = findings.Select(f => new
             {
-                f.Id, f.Title, f.Department, f.Category,
-                f.Description, f.ClauseRef, f.FoundAt, f.Status,
-                f.SessionId, f.ChecklistItemId,
+                f.Id,
+                f.Title,
+                f.Department,
+                f.Category,
+                f.Description,
+                f.ClauseRef,
+                f.FoundAt,
+                f.Status,
+                f.SessionId,
+                f.ChecklistItemId,
                 f.ReporterName,
                 f.ReporterId,
                 ReporterFullName = f.Reporter?.FullName
@@ -91,7 +99,7 @@ public class FindingController(AppDbContext db) : ControllerBase
         }
 
         var minorCategory = await db.FindingCategories
-            .FirstOrDefaultAsync(c => c.Name == "Minor NC" && c.IsActive);
+            .FirstOrDefaultAsync(c => c.Name == DefaultCategories.Minor && c.IsActive);
 
         if (minorCategory == null)
             return BadRequest(new { message = "Category 'Minor NC' tidak ditemukan" });
@@ -121,7 +129,7 @@ public class FindingController(AppDbContext db) : ControllerBase
     public async Task<IActionResult> Update(Guid id, [FromBody] UpdateFindingRequest req)
     {
         var finding = await db.Findings.FindAsync(id);
-        if (finding is null) return NotFound(new { message = "Finding tidak ditemukan"});
+        if (finding is null) return NotFound(new { message = "Finding tidak ditemukan" });
 
         if (req.ReporterId.HasValue)
         {
@@ -139,9 +147,17 @@ public class FindingController(AppDbContext db) : ControllerBase
 
         finding.Title = req.Title;
         finding.Department = req.Department;
-        finding.Category = req.Category ?? finding.Category;
         finding.Description = req.Description;
         finding.ClauseRef = req.ClauseRef;
+
+        if (req.CategoryId.HasValue)
+        {
+            var category = await db.FindingCategories
+                .FirstOrDefaultAsync(c => c.Id == req.CategoryId && c.IsActive);
+            if (category == null)
+                return BadRequest(new { message = "Category tidak valid atau tidak aktif" });
+            finding.CategoryId = req.CategoryId;
+        }
         await db.SaveChangesAsync();
         return Ok(MapToResponseDto(finding));
     }
@@ -151,7 +167,7 @@ public class FindingController(AppDbContext db) : ControllerBase
     public async Task<IActionResult> UpdateStatus(Guid id, [FromBody] FindingStatus status)
     {
         var finding = await db.Findings.FindAsync(id);
-        if (finding is null) return NotFound(new { message = "Finding tidak ditemukan"});
+        if (finding is null) return NotFound(new { message = "Finding tidak ditemukan" });
         finding.Status = status;
         await db.SaveChangesAsync();
         return NoContent();
@@ -162,7 +178,7 @@ public class FindingController(AppDbContext db) : ControllerBase
     public async Task<IActionResult> Delete(Guid id)
     {
         var finding = await db.Findings.FindAsync(id);
-        if (finding is null) return NotFound(new { message = "Finding tidak ditemukan"});
+        if (finding is null) return NotFound(new { message = "Finding tidak ditemukan" });
         db.Findings.Remove(finding);
         await db.SaveChangesAsync();
         return NoContent();

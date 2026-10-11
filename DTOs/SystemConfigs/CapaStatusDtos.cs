@@ -12,7 +12,7 @@ public class CreateCapaStatusDto
     public string Description { get; set; } = string.Empty;
 
     [Required(ErrorMessage = "Order index wajib diisi")]
-    [Range(1, 100, ErrorMessage = "Order index harus natara 1-100")]
+    [Range(1, 100, ErrorMessage = "Order index harus antara 1-100")]
     public int OrderIndex { get; set; }
     public bool IsTerminal { get; set; }
 }

@@ -13,8 +13,8 @@ public class Finding
     public User? Reporter { get; set; }
     public string Title { get; set; } = string.Empty;
     public string Department { get; set; } = string.Empty;
-    public Guid CategoryId { get; set; }
-    public FindingCategory Category { get; set; } = null!;
+    public Guid? CategoryId { get; set; }
+    public FindingCategory? Category { get; set; } = null!;
     public string Description { get; set; } = string.Empty;
     public string ClauseRef { get; set; } = string.Empty;
     public DateTime FoundAt { get; set; } = DateTime.UtcNow;

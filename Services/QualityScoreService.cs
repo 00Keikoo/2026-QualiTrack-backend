@@ -82,27 +82,41 @@ public class QualityScoreService(AppDbContext db) : IQualityScoreService
     
         var result = sessions
             .GroupBy(s => s.Schedule.Department)
-            .Select(deptGroup => new DepartmentTrendDto
+            .Select(deptGroup =>
             {
-                Department = deptGroup.Key,
-                Data = deptGroup
-                    .GroupBy(s => new { s.CompletedAt!.Value.Year, s.CompletedAt.Value.Month })
+                var periodData = deptGroup
+                    .GroupBy(s => new { s.CompletedAt!.Value.Year, s.CompletedAt.Value.Month})
                     .Select(periodGroup =>
+                    {
+                        var totalItems = periodGroup.Sum(s => s.Responses.Count);
+                        var totalConform = periodGroup.Sum(s => s.Responses.Count(r => r.Answer == ResponseAnswer.Conform));
+
+                        return new PeriodScoreDto
                         {
-                            var totalItems = periodGroup.Sum(s => s.Responses.Count);
-                            var totalConform = periodGroup.Sum(s => s.Responses.Count(r => r.Answer == ResponseAnswer.Conform));
-    
-                            return new PeriodScoreDto
-                            {
-                                Year = periodGroup.Key.Year,
-                                Month = periodGroup.Key.Month,
-                                PeriodLabel = new DateTime(periodGroup.Key.Year, periodGroup.Key.Month, 1).ToString("MMM yyyy"),
-                                TotalSessions = periodGroup.Count(),
-                                ComplianceScore = totalItems == 0 ? 0 : Math.Round((double)totalConform / totalItems * 100, 1)
-                            };
-                        })
-                        .OrderBy(p => p.Year).ThenBy(p => p.Month)
-                        .ToList()
+                            Year = periodGroup.Key.Year,
+                            Month = periodGroup.Key.Month,
+                            PeriodLabel = new DateTime(periodGroup.Key.Year, periodGroup.Key.Month, 1).ToString("MMM yyyy"),
+                            TotalSessions = periodGroup.Count(),
+                            ComplianceScore = totalItems == 0 ? 0 : Math.Round((double) totalConform / totalItems * 100, 1)
+                        };
+                    })
+                    .OrderBy(p => p.Year).ThenBy(p => p.Month)
+                    .ToList();
+
+                for (int i = 1; i < periodData.Count; i++)
+                {
+                    periodData[i].PreviousScore = periodData[i - 1].ComplianceScore;
+                    periodData[i].Difference = Math.Round(periodData[i].ComplianceScore - periodData[i - 1].ComplianceScore, 1);
+                    var diff = periodData[i].Difference ?? 0;
+                    periodData [i].Trend = Math.Abs(diff) < 0.1 ? "stable"
+                        : diff > 0 ? "up" : "down";
+                }
+
+                return new DepartmentTrendDto
+                {
+                    Department = deptGroup.Key,
+                    Data = periodData
+                };
             })
             .OrderBy(d => d.Department)
             .ToList();

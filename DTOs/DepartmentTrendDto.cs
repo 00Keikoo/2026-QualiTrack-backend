@@ -13,6 +13,9 @@ public class PeriodScoreDto
     public int Month { get; set; }
     public double ComplianceScore { get; set; }
     public int TotalSessions { get; set; }
+    public double? PreviousScore { get; set; }
+    public double? Difference { get; set; }
+    public string? Trend { get; set; }
 }
 
 public class OverallTrendDto

@@ -12,5 +12,5 @@ public class UpdateDateFormatDto
 public class DateFormatResponseDto
 {
     public string DateFormat { get; set; } = string.Empty;
-    public DateTime UpdateAt { get; set; }
+    public DateTime? UpdateAt { get; set; }
 }

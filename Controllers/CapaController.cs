@@ -6,6 +6,7 @@ using QualiTrack.Data;
 using QualiTrack.Models;
 using QualiTrack.DTOs;
 using QualiTrack.Filters;
+using QualiTrack.Constants;
 
 namespace QualiTrack.Controllers;
 
@@ -116,7 +117,7 @@ public class CapaController(AppDbContext db) : ControllerBase
         }
 
         var openStatus = await db.CapaStatuses
-            .FirstOrDefaultAsync(s => s.Name == "Open" && s.IsActive);
+            .FirstOrDefaultAsync(s => s.Name == DefaultStatuses.Open && s.IsActive);
 
         if (openStatus == null)
             return BadRequest(new { message = "Status 'Open' tidak ditemukan" });

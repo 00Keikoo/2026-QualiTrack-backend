@@ -13,8 +13,8 @@ public class CAPA
     public Guid PicId { get; set; }
     public User? Pic { get; set; }
     public DateOnly Deadline { get; set; }
-    public Guid StatusId { get; set; }
-    public CapaStatus Status { get; set; } = null!;
+    public Guid? StatusId { get; set; }
+    public CapaStatus? Status { get; set; } = null!;
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime? ClosedAt { get; set; }
     public CloseOutVerification? CloseOut { get; set; }
