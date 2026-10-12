@@ -26,13 +26,13 @@ public class CapaController(AppDbContext db) : ControllerBase
             .Include(c => c.CloseOut)
                 .ThenInclude(co => co!.VerifiedBy)
             .Include(c => c.Pic)
-            .Include(c => c.Finding)
+            .Include(c => c.Finding!)
                 .ThenInclude(f => f.Category!)
             .Include(c => c.Status)
             .AsQueryable();
 
         if (!string.IsNullOrEmpty(statusName))
-            query = query.Where(c => c.Status.Name == statusName);
+            query = query.Where(c => c.Status!.Name == statusName);
 
         if (User.IsInRole("Auditee"))
         {
@@ -51,11 +51,11 @@ public class CapaController(AppDbContext db) : ControllerBase
     {
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
         var query = db.CAPAs
-            .Where(c => c.Deadline < today && !c.Status.IsTerminal)
+            .Where(c => c.Deadline < today && !c.Status!.IsTerminal)
             .Include(c => c.Actions)
             .Include(c => c.Pic)
             .Include(c => c.Status)
-            .Include(c => c.Finding)
+            .Include(c => c.Finding!)
                 .ThenInclude(f => f.Category!)
             .AsQueryable();
 
@@ -79,7 +79,7 @@ public class CapaController(AppDbContext db) : ControllerBase
             .Include(c => c.CloseOut)
             .Include(c => c.Pic)
             .Include(c => c.Status)
-            .Include(c => c.Finding)
+            .Include(c => c.Finding!)
                 .ThenInclude(f => f.Category!)
             .FirstOrDefaultAsync(c => c.Id == id);
 
@@ -143,7 +143,7 @@ public class CapaController(AppDbContext db) : ControllerBase
             .Include(c => c.Actions)
             .Include(c => c.Pic)
             .Include(c => c.Status)
-            .Include(c => c.Finding)
+            .Include(c => c.Finding!)
                 .ThenInclude(f => f.Category!)
             .FirstOrDefaultAsync(c => c.Id == capa.Id);
 
@@ -196,7 +196,7 @@ public class CapaController(AppDbContext db) : ControllerBase
             if (capa.PicId != userId) return Forbid();
         }
 
-        if (capa.Status.IsTerminal && capa.CloseOut != null)
+        if (capa.Status!.IsTerminal && capa.CloseOut != null)
             return BadRequest(new { message = "CAPA yang sudah ditutup dan terverifikasi tidak dapat diubah statusnya" });
 
         // Validate new status exists and active
@@ -234,7 +234,7 @@ public class CapaController(AppDbContext db) : ControllerBase
         };
 
         db.CAPAActions.Add(action);
-        if (!capa.Status.IsTerminal)
+        if (!capa.Status!.IsTerminal)
         {
             var inProgressStatus = await db.CapaStatuses
                 .FirstOrDefaultAsync(s => s.Name == "InProgress");

@@ -29,7 +29,7 @@ public class FindingController(AppDbContext db) : ControllerBase
             .AsQueryable();
         if (status.HasValue) query = query.Where(f => f.Status == status);
         if (!string.IsNullOrEmpty(categoryName))
-            query = query.Where(f => f.Category.Name == categoryName);
+            query = query.Where(f => f.Category!.Name == categoryName);
         if (from.HasValue) query = query.Where(f => f.FoundAt >= from.Value);
         if (to.HasValue) query = query.Where(f => f.FoundAt <= to.Value);
         return Ok(await query.ToListAsync());
@@ -39,7 +39,10 @@ public class FindingController(AppDbContext db) : ControllerBase
     [Authorize(Roles = "Admin,QualityManager,AuditorInternal,Auditee")]
     public async Task<IActionResult> GetById(Guid id)
     {
-        var finding = await db.Findings.Include(f => f.Reporter).FirstOrDefaultAsync(f => f.Id == id);
+        var finding = await db.Findings
+            .Include(f => f.Reporter)
+            .Include(f => f.Category)
+            .FirstOrDefaultAsync(f => f.Id == id);
         return finding is null ? NotFound() : Ok(finding);
     }
 
@@ -193,7 +196,7 @@ public class FindingController(AppDbContext db) : ControllerBase
         ReporterId = f.ReporterId,
         Title = f.Title,
         Department = f.Department,
-        Category = f.Category,
+        Category = f.Category!,
         Description = f.Description,
         ClauseRef = f.ClauseRef,
         FoundAt = f.FoundAt,

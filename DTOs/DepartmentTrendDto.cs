@@ -25,4 +25,6 @@ public class OverallTrendDto
     public int Month { get; set; }
     public double OverallScore { get; set; }
     public int DepartmentCount { get; set; }
+    public double? Difference { get; set; }
+    public string? Trend { get; set; }
 }

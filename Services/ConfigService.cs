@@ -7,9 +7,9 @@ public class ConfigService
 {
     private readonly AppDbContext _db;
     private string? _cachedTimeZone;
-    private DateTime _timeZoneCacheExpiry;
+    private DateTime _timeZoneCacheExpiry = DateTime.MinValue;
     private string? _cachedDateFormat;
-    private DateTime _dateFormatCacheExpiry;
+    private DateTime _dateFormatCacheExpiry = DateTime.MinValue;
 
     public ConfigService(AppDbContext db)
     {

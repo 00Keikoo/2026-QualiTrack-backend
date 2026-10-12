@@ -28,11 +28,11 @@ public class DashboardController(AppDbContext db) : ControllerBase
 
         var capaOpen = await db.CAPAs
             .Include(c => c.Status)
-            .CountAsync(c => !c.Status.IsTerminal);
+            .CountAsync(c => c.Status != null && !c.Status.IsTerminal);
             
         var capaOverdue = await db.CAPAs
             .Include(c => c.Status)
-            .CountAsync(c => c.Deadline < today && !c.Status.IsTerminal);
+            .CountAsync(c => c.Deadline < today && c.Status != null && !c.Status.IsTerminal);
 
         return Ok(new
         {
@@ -229,8 +229,8 @@ public class DashboardController(AppDbContext db) : ControllerBase
                 complianceScore,
                 totalFindings = findings.Count,
                 totalCapa = capas.Count,
-                capaOpen = capas.Count(c => c.Status.IsTerminal),
-                capaOverdue = capas.Count(c => c.Deadline < today && !c.Status.IsTerminal)
+                capaOpen = capas.Count(c => c.Status!.IsTerminal),
+                capaOverdue = capas.Count(c => c.Deadline < today && !c.Status!.IsTerminal)
             },
             schedules = schedules.Select(s =>
             {
@@ -249,9 +249,9 @@ public class DashboardController(AppDbContext db) : ControllerBase
                     status = session == null ? "NotStarted" : session.Status.ToString(),
                     sessionId = session?.Id,
                     totalFindings = sessionFindings.Count,
-                    majorNC = sessionFindings.Count(f => f.Category.Name == "Major NC"),
-                    minorNC = sessionFindings.Count(f => f.Category.Name == "Minor NC"),
-                    observation = sessionFindings.Count(f => f.Category.Name == "Observation")
+                    majorNC = sessionFindings.Count(f => f.Category!.Name == "Major NC"),
+                    minorNC = sessionFindings.Count(f => f.Category!.Name == "Minor NC"),
+                    observation = sessionFindings.Count(f => f.Category!.Name == "Observation")
                 };
             })
         });

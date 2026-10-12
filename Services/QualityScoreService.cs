@@ -141,6 +141,14 @@ public class QualityScoreService(AppDbContext db) : IQualityScoreService
             })
             .OrderBy(x => x.Year).ThenBy(x => x.Month)
             .ToList();
+
+        // Calculate difference dan trend
+        for (int i = 1; i < result.Count; i++)
+        {
+            var diff = result[i].OverallScore - result[i - 1].OverallScore;
+            result[i].Difference = Math.Round(diff, 1);
+            result[i].Trend = Math.Abs(diff) < 0.1 ? "stable" : diff > 0 ? "up" : "down";
+        }
     
         return result;
     }

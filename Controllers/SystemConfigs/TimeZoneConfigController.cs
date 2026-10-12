@@ -18,15 +18,34 @@ public class TimeZoneConfigController(AppDbContext db) : ControllerBase
 {
     private readonly AppDbContext _db = db;
 
+    [HttpGet("options")]
+    [AllowAnonymous]
+    public IActionResult GetTImeZoneOptions()
+    {
+        var options = new List<TimeZoneOptionDto>
+        {
+            new() { Code ="WIB", Name = "Waktu Indonesia Barat", SystemTimeZoneId = IndonesiaTimeZones.WIB, UtcOffsets = 7},
+            new() { Code ="WITA", Name = "Waktu Indonesia Tengah", SystemTimeZoneId = IndonesiaTimeZones.WITA, UtcOffsets = 8},
+            new() { Code ="WIT", Name = "Waktu Indonesia Timur", SystemTimeZoneId = IndonesiaTimeZones.WIT, UtcOffsets = 9}
+
+        };
+        return Ok(options);
+    }
+
     [HttpGet]
     public async Task<IActionResult> GetTimeZone()
     {
         var config = await _db.SystemConfigs
             .FirstOrDefaultAsync(c => c.Key == SystemConfigKeys.TimeZone);
 
+        var SystemTimeZoneId = config?.Value ?? IndonesiaTimeZones.WIB;
+        var zoneCode = IndonesiaTimeZones.Zones.FirstOrDefault(x => x.Value == SystemTimeZoneId).Key ?? "WIB";
+
         var response = new TimeZoneResponseDto
         {
-            TimeZone = config?.Value ?? "Asia/Jakarta",
+            TimeZone = zoneCode,
+            GetSystemTimeZoneId = SystemTimeZoneId,
+            UtcOffsets = IndonesiaTimeZones.UtcOffsets.GetValueOrDefault(zoneCode, 7),
             UpdatedAt = config?.UpdateAt
         };
 
@@ -36,34 +55,28 @@ public class TimeZoneConfigController(AppDbContext db) : ControllerBase
     [HttpPut]
     public async Task<IActionResult> UpdateTimeZone([FromBody] UpdateTimeZoneDto dto)
     {
-        try
+        if(!IndonesiaTimeZones.IsValid(dto.TimeZone))
         {
-            TimeZoneInfo.FindSystemTimeZoneById(dto.TimeZone);
+            return BadRequest(new { message = "Timezone tidak valid. Pilih: WIB, WITA, atau WIT"});
         }
-        catch (TimeZoneNotFoundException)
-        {
-            return BadRequest(new { message = "Timezone tidak valid" });
-        }
-        catch (InvalidTimeZoneException)
-        {
-            return BadRequest(new { message = "Format timezone tidak valid" });
-        }
+
+        var systemTimeZoneId = IndonesiaTimeZones.GetSystemTimeZoneId(dto.TimeZone);
         var config = await _db.SystemConfigs
-            .FirstOrDefaultAsync(c => c.Key == "TimeZone");
+            .FirstOrDefaultAsync(c => c.Key == SystemConfigKeys.TimeZone);
 
         if (config == null)
         {
             config = new Models.SystemConfig
             {
-                Key = "TimeZone",
-                Value = dto.TimeZone,
+                Key = SystemConfigKeys.TimeZone,
+                Value = systemTimeZoneId,
                 UpdateAt = DateTime.UtcNow
             };
             _db.SystemConfigs.Add(config);
         }
         else
         {
-            config.Value = dto.TimeZone;
+            config.Value = systemTimeZoneId;
             config.UpdateAt = DateTime.UtcNow;
         }
 
@@ -77,7 +90,7 @@ public class TimeZoneConfigController(AppDbContext db) : ControllerBase
                 AdminId = Guid.Parse(userId),
                 Action = "UPDATE_TIMEZONE",
                 EntityType = "SystemConfig",
-                Description = $"Changed timezone to {dto.TimeZone}",
+                Description = $"Changed timezone to {dto.TimeZone} ({systemTimeZoneId})",
                 CreatedAt = DateTime.UtcNow
             };
             _db.AdminActivityLogs.Add(activity);
