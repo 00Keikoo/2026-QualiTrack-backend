@@ -105,7 +105,7 @@ public class FindingController(AppDbContext db) : ControllerBase
             .FirstOrDefaultAsync(c => c.Name == DefaultCategories.Minor && c.IsActive);
 
         if (minorCategory == null)
-            return BadRequest(new { message = "Category 'Minor NC' tidak ditemukan" });
+            return BadRequest(new { message = $"Category '{DefaultCategories.Minor}' tidak ditemukan" });
 
         var finding = new Finding
         {

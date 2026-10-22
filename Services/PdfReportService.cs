@@ -1,11 +1,25 @@
 using QuestPDF.Fluent;
 using QuestPDF.Helpers;
+using Docnet.Core;
+using Docnet.Core.Models;
 using QuestPDF.Infrastructure;
+using Microsoft.Extensions.Logging;
+using QualiTrack.Constants;
 using QualiTrack.Models;
 
 namespace QualiTrack.Services;
 
-public class PdfReportService(IStorageService storage, IWebHostEnvironment env, IHttpClientFactory httpClientFactory)
+public class PdfReportMetadata
+{
+    public int PageCount { get; set; }
+    public long FileSizeBytes { get; set; }
+    public string FileSizeFormatted { get; set; } = string.Empty;
+}
+public class PdfReportService(
+    IStorageService storage,
+    IWebHostEnvironment env,
+    IHttpClientFactory httpClientFactory,
+    ILogger<PdfReportService> logger)
 {
     public async Task<byte[]> GenerateAuditReport(AuditSession session)
     {
@@ -93,7 +107,7 @@ public class PdfReportService(IStorageService storage, IWebHostEnvironment env, 
     {
         container.Column(col =>
         {
-            // ===== HEADER =====
+            //HEADER
             col.Item().Background("#1a3a5c").Padding(16).Column(h =>
             {
                 h.Item().Text("QUALITRACK - AUDIT REPORT")
@@ -120,7 +134,7 @@ public class PdfReportService(IStorageService storage, IWebHostEnvironment env, 
                 InfoRow("Audit Status", session.Status.ToString());
             });
 
-            // ===== AUDIT SUMMARY =====
+            //AUDIT SUMMARY
             if (!string.IsNullOrEmpty(session.Summary?.Content))
             {
                 col.Item().PaddingTop(12).Column(s =>
@@ -131,7 +145,7 @@ public class PdfReportService(IStorageService storage, IWebHostEnvironment env, 
                 });
             }
 
-            // ===== CHECKLIST RESULT =====
+            //CHECKLIST RESULT
             col.Item().PaddingTop(16).Column(s =>
             {
                 s.Item().Background("#f0f4f8").Padding(8).Text("Checklist Result")
@@ -181,7 +195,7 @@ public class PdfReportService(IStorageService storage, IWebHostEnvironment env, 
                 }
             });
 
-            // ===== EVIDENCE DOCUMENTATION =====
+            //EVIDENCE DOCUMENTATION
             var passResponses = responses.Where(r => r.Answer == ResponseAnswer.Conform && r.Evidences != null && r.Evidences.Any()).ToList();
             var failFindings = findings.Where(f => f.Category!.Name == "MajorNC" || f.Category.Name == "MinorNC" || f.Category.Name == "OFI").ToList();
 
@@ -270,5 +284,85 @@ public class PdfReportService(IStorageService storage, IWebHostEnvironment env, 
             //     });
             // });
         });
+    }
+
+    public async Task<PdfReportMetadata> GetOrGeneratePdfMetadata(Guid sessionId, AuditSession? session = null)
+    {
+        var pdfPath = GetPdfFilePath(sessionId);
+        if (!File.Exists(pdfPath))
+        {
+            await GenerateAndSavePdfAsync(sessionId, session, pdfPath);
+        }
+
+        return await ExtractPdfMetadataAsync(pdfPath);
+    }
+
+    private string GetPdfFilePath(Guid sessionId)
+    {
+        var fileName = $"{FileConstants.AuditReportFilePrefix}{sessionId}{FileConstants.AuditReportFileExtension}";
+        return Path.Combine(env.ContentRootPath, FileConstants.UploadsFolder, fileName);
+    }
+
+    private async Task GenerateAndSavePdfAsync(Guid sessionId, AuditSession? session, string pdfPath)
+    {
+        if (session == null )
+        {
+            logger.LogError("Cannot generate PDF for session {SessionId}: session object is null", sessionId);
+            throw new ArgumentNullException(nameof(session), $"Session object is required to generate PDF for session {sessionId}");
+        }
+
+        try
+        {
+            var pdfBytes = await GenerateAuditReport(session);
+            await File.WriteAllBytesAsync(pdfPath, pdfBytes);
+            logger.LogInformation("PDF generated succesfully for session {SessionId} at {Path}", sessionId, pdfPath);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Failed to generate PDF for session {SessionId}", sessionId);
+            throw;
+        }
+    }
+
+    private async Task<PdfReportMetadata> ExtractPdfMetadataAsync(string pdfPath)
+    {
+        try
+        {
+            var fileInfo = new FileInfo(pdfPath);
+            var fileSizeBytes = fileInfo.Length;
+            var pdfBytes = await File.ReadAllBytesAsync(pdfPath);
+            var pageCount = CountPdfPages(pdfBytes);
+            return new PdfReportMetadata
+            {
+                PageCount = pageCount,
+                FileSizeBytes = fileSizeBytes,
+                FileSizeFormatted = FormatFileSize(fileSizeBytes)
+            };
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Failed to extract metadata from PDF at {Path}", pdfPath);
+            throw;
+        }
+    }
+
+    private static int CountPdfPages(byte[] pdfBytes)
+    {
+        using var docReader = DocLib.Instance.GetDocReader(pdfBytes, new PageDimensions(1080, 1920));
+        return docReader.GetPageCount();
+    }
+
+    private static string FormatFileSize(long bytes)
+    {
+        string[] sizes = { "B", "KB", "MB", "GB"};
+        double size = bytes;
+        int order = 0;
+
+        while (size >= 1024 && order < sizes.Length - 1)
+        {
+            order++;
+            size /= 1024;
+        }
+        return $"{size:0.##} {sizes[order]}";
     }
 }

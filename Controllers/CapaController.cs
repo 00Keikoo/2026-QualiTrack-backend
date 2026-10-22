@@ -98,7 +98,7 @@ public class CapaController(AppDbContext db) : ControllerBase
     public async Task<IActionResult> Create(Guid findingId, [FromBody] CreateCapaRequest req)
     {
         var finding = await db.Findings.FindAsync(findingId);
-        if (finding is null) return NotFound("Finding tidak ditemukan");
+        if (finding is null) return NotFound(new { message = "Finding tidak ditemukan"});
 
         if (!req.Deadline.HasValue)
             return BadRequest(new { message = "Deadline wajib diisi" });
@@ -186,6 +186,7 @@ public class CapaController(AppDbContext db) : ControllerBase
     public async Task<IActionResult> UpdateStatus(Guid id, [FromBody] Guid statusId)
     {
         var capa = await db.CAPAs
+            .Include(c => c.Status)
             .Include(c => c.CloseOut)
             .FirstOrDefaultAsync(c => c.Id == id);
         if (capa is null) 

@@ -1,16 +1,21 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using QualiTrack.Data;
 using QualiTrack.DTOs;
 using QualiTrack.Models;
+using QualiTrack.Services;
 
 namespace QualiTrack.Controllers;
 
 [ApiController]
 [Route("api/audit-reports")]
 [Authorize]
-public class AuditReportController(AppDbContext db) : ControllerBase
+public class AuditReportController(
+    AppDbContext db,
+    PdfReportService pdfService,
+    ILogger<AuditReportController> logger) : ControllerBase
 {
     [HttpGet]
 
@@ -31,6 +36,12 @@ public class AuditReportController(AppDbContext db) : ControllerBase
             .Include(s => s.Findings)
                 .ThenInclude(f => f.Capa)
                     .ThenInclude(c => c!.Status!)
+            .Include(s => s.Findings)
+                .ThenInclude(f => f.Evidences)
+            .Include(s => s.Responses)
+                .ThenInclude(r => r.Evidences)
+            .Include(s => s.Responses)
+                .ThenInclude(r => r.ChecklistItem)
             .ToListAsync();
 
         if (!string.IsNullOrEmpty(standard))
@@ -40,25 +51,49 @@ public class AuditReportController(AppDbContext db) : ControllerBase
         if (year.HasValue)
             sessions = sessions.Where(s => s.Schedule.AuditPlan.Year == year).ToList();
 
-        var result = sessions.Select(s => new AuditReportListItemDto
+        var result = new List<AuditReportListItemDto>();
+
+        foreach (var s in sessions)
         {
-            AuditPlanId = s.Schedule.AuditPlanId,
-            AuditPlanTitle = s.Schedule.AuditPlan.Title,
-            Standard = s.Schedule.AuditPlan.Standard,
-            Priority = s.Schedule.AuditPlan.Priority,
-            ScheduleId = s.ScheduleId,
-            Department = s.Schedule.Department,
-            AuditorName = s.Schedule.Auditor?.FullName ?? s.Schedule.AuditorName,
-            ScheduledDate = s.Schedule.ScheduledDate,
-            SessionId = s.Id,
-            CompletedAt = s.CompletedAt,
-            SummaryContent = s.Summary?.Content,
-            TotalFindings = s.Findings.Count,
-            TotalMajorNC = s.Findings.Count(f => f.Category!.Name == "MajorNC"),
-            TotalMinorNC = s.Findings.Count(f => f.Category!.Name == "MinorNC"),
-            TotalCAPAs = s.Findings.Count(f => f.Capa != null),
-            ClosedCAPAs = s.Findings.Count(f => f.Capa != null && f.Capa.Status!.IsTerminal)
-        }).OrderByDescending(r => r.CompletedAt).ToList();
+            var item = new AuditReportListItemDto
+            {
+                AuditPlanId = s.Schedule.AuditPlanId,
+                AuditPlanTitle = s.Schedule.AuditPlan.Title,
+                Standard = s.Schedule.AuditPlan.Standard,
+                Priority = s.Schedule.AuditPlan.Priority,
+                ScheduleId = s.ScheduleId,
+                Department = s.Schedule.Department,
+                AuditorName = s.Schedule.Auditor?.FullName ?? s.Schedule.AuditorName,
+                ScheduledDate = s.Schedule.ScheduledDate,
+                SessionId = s.Id,
+                CompletedAt = s.CompletedAt,
+                SummaryContent = s.Summary?.Content,
+                TotalFindings = s.Findings.Count,
+                TotalMajorNC = s.Findings.Count(f => f.Category!.Name == "MajorNC"),
+                TotalMinorNC = s.Findings.Count(f => f.Category!.Name == "MinorNC"),
+                TotalCAPAs = s.Findings.Count(f => f.Capa != null),
+                ClosedCAPAs = s.Findings.Count(f => f.Capa != null && f.Capa.Status!.IsTerminal)
+            };
+
+            try
+            {
+                var metadata = await pdfService.GetOrGeneratePdfMetadata(s.Id, s);
+                item.PageCount = metadata.PageCount;
+                item.FileSizeBytes = metadata.FileSizeBytes;
+                item.FileSizeFormatted = metadata.FileSizeFormatted;
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(ex, "Failed to generate PDF metadata for session {SessionId}", s.Id);
+                item.PageCount = null;
+                item.FileSizeBytes = null;
+                item.FileSizeFormatted = null;
+            }
+
+            result.Add(item);
+        }
+
+        result = result.OrderByDescending(r => r.CompletedAt).ToList();
 
         return Ok(new { message = "Data laporan audit berhasil diambil", total = result.Count, data = result });
     }

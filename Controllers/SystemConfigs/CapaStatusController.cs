@@ -21,8 +21,8 @@ public class CapaStatusController(AppDbContext db) : ControllerBase
     {
         var statuses = await _db.CapaStatuses
             .Include(s => s.Capas)
-            .AsNoTracking()
             .OrderBy(s => s.OrderIndex)
+            .AsNoTracking()
             .Select(s => new CapaStatusResponseDto
             {
                 Id = s.Id,

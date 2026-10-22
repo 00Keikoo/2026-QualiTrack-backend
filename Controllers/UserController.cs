@@ -70,7 +70,7 @@ public class UserController : ControllerBase
 
     // GET /api/users/pic-candidates
     [HttpGet("pic-candidates")]
-    [Authorize(Roles = "Admin,QualityManager,Auditor")]
+    [Authorize(Roles = "Admin,QualityManager,AuditorInternal")]
     public async Task<IActionResult> GetPicCandidates()
     {
         var pics = await _db.Users

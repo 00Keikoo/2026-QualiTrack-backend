@@ -337,6 +337,6 @@ public class AuthController(AppDbContext db, IConfiguration config, IEmailServic
         var bytes = new byte[OtpLength];
         rng.GetBytes(bytes);
         var value = BitConverter.ToUInt32(bytes, 0);
-        return (value % (OtpMax - OtpMin + 1)).ToString();
+        return ((value % (OtpMax - OtpMin + 1)) + OtpMin).ToString();
     }
 }

@@ -19,7 +19,6 @@ public class FindingCategoryController(AppDbContext db) : ControllerBase
     {
         var categories = await _db.FindingCategories
             .Where(c => c.IsActive)
-            .Include(c => c.Findings)
             .AsNoTracking()
             .OrderBy(c => c.Severity)
             .Select(c => new FindingCategoryResponseDto

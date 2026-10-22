@@ -19,6 +19,9 @@ public class AuditReportListItemDto
     public int TotalMinorNC { get; set; }
     public int TotalCAPAs { get; set; }
     public int ClosedCAPAs { get; set; }
+    public int? PageCount { get; set; }
+    public long? FileSizeBytes { get; set; }
+    public string? FileSizeFormatted { get; set; }
 }
 
 public class AuditReportDetailDto

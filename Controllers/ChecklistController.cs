@@ -11,7 +11,7 @@ namespace QualiTrack.Controllers;
 [ApiController]
 [Route("api/checklists")]
 [Authorize]
-[ValidateModel]
+[ValidateModelAttribute]
 public class ChecklistController(AppDbContext db) : ControllerBase
 {
     [HttpGet]
