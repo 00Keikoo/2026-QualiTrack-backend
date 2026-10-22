@@ -36,6 +36,7 @@ public class ConfigService
             var config = await _db.SystemConfigs
                 .FirstOrDefaultAsync(c => c.Key == "DateFormat");
             _cachedDateFormat = config?.Value ?? "dd-MM-yyyy";
+            _dateFormatCacheExpiry = DateTime.UtcNow.AddMinutes(5);
         }
 
         return _cachedDateFormat;

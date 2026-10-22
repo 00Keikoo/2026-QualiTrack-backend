@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace QualiTrack.Models;
 
 public class FindingCategory
@@ -12,5 +14,6 @@ public class FindingCategory
     public DateTime DeleteAt { get; set; }
     public Guid? DeletedById { get; set; }
 
+    [JsonIgnore]
     public ICollection<Finding> Findings { get; set; } = []; 
 }

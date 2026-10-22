@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using System.Text.Json.Serialization;
 using QualiTrack.Constants;
 
 namespace QualiTrack.Models;
@@ -15,6 +16,7 @@ public class User
     public string Email { get; set; } = string.Empty;
     
     [Required(ErrorMessage = "Password wajib diisi")]
+    [JsonIgnore]
     public string PasswordHash { get; set; } = string.Empty;
     
     [Required(ErrorMessage = "Role wajib diisi")]
