@@ -9,12 +9,12 @@ namespace QualiTrack.Controllers;
 
 [ApiController]
 [Route("api/departments")]
-[Authorize(Roles = "Admin")]
 public class DepartmentController(AppDbContext db) : ControllerBase
 {
     private readonly AppDbContext _db = db;
 
     [HttpGet]
+    [Authorize(Roles = "Admin,QualityManager,AuditorInternal,Auditee")]
     public async Task<IActionResult> GetAll()
     {
         var departments = await _db.Departments
@@ -36,6 +36,7 @@ public class DepartmentController(AppDbContext db) : ControllerBase
     }
 
     [HttpGet("{id}")]
+    [Authorize(Roles = "Admin,QualityManager,AuditorInternal,Auditee")]
     public async Task<IActionResult> GetById(Guid id)
     {
         var department = await _db.Departments
@@ -60,6 +61,7 @@ public class DepartmentController(AppDbContext db) : ControllerBase
     }
 
     [HttpPost]
+    [Authorize(Roles = "Admin")]
     public async Task<IActionResult> Create([FromBody] CreateDepartmentDto dto)
     {
         var exists = await _db.Departments
@@ -94,6 +96,7 @@ public class DepartmentController(AppDbContext db) : ControllerBase
     }
 
     [HttpPut("{id}")]
+    [Authorize(Roles = "Admin")]
     public async Task<IActionResult> Update(Guid id, [FromBody] UpdateDepartmentDto dto)
     {
         var department = await _db.Departments.FindAsync(id);
@@ -129,6 +132,7 @@ public class DepartmentController(AppDbContext db) : ControllerBase
     }
 
     [HttpPatch("{id}/status")]
+    [Authorize(Roles = "Admin")]
     public async Task<IActionResult> UpdateStatus(Guid id, [FromBody] bool isActive)
     {
         var department = await _db.Departments.FindAsync(id);
@@ -144,6 +148,7 @@ public class DepartmentController(AppDbContext db) : ControllerBase
     }
 
     [HttpDelete("{id}")]
+    [Authorize(Roles = "Admin")]
     public async Task<IActionResult> Delete(Guid id)
     {
         var department = await _db.Departments.FindAsync(id);
