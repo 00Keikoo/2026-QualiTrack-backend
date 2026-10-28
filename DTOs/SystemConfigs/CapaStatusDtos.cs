@@ -11,6 +11,10 @@ public class CreateCapaStatusDto
     [MaxLength(200, ErrorMessage = "Deskripsi maksimal 200 karakter")]
     public string Description { get; set; } = string.Empty;
 
+    [Required(ErrorMessage = "HexaCode wajib diisi")]
+    [RegularExpression(@"^#[0-9A-Fa-f]{6}$", ErrorMessage = "HexaCode harus format hex yang valid (contoh: #FF5733)")]
+    public string HexaCode { get; set; } = "#808080";
+
     [Required(ErrorMessage = "Order index wajib diisi")]
     [Range(1, 100, ErrorMessage = "Order index harus antara 1-100")]
     public int OrderIndex { get; set; }
@@ -26,6 +30,10 @@ public class UpdateCapaStatusDto
     [MaxLength(200, ErrorMessage = "Deskripsi maksimal 200 karakter")]
     public string Description { get; set; } = string.Empty;
 
+    [Required(ErrorMessage = "HexaCode wajib diisi")]
+    [RegularExpression(@"^#[0-9A-Fa-f]{6}$", ErrorMessage = "HexaCode harus format hex yang valid (contoh: #FF5733)")]
+    public string HexaCode { get; set; } = "#808080";
+
     [Required(ErrorMessage = "Order index wajib diisi")]
     [Range(1, 100, ErrorMessage = "Order index harus antara 1-100")]
     public int OrderIndex { get; set; }
@@ -37,6 +45,7 @@ public class CapaStatusResponseDto
     public Guid Id { get; set; }
     public string Name { get; set; } = string.Empty;
     public string Description { get; set; } = string.Empty;
+    public string HexaCode { get; set; } = string.Empty;
     public int OrderIndex { get; set; }
     public bool IsTerminal { get; set; }
     public bool IsActive { get; set; }

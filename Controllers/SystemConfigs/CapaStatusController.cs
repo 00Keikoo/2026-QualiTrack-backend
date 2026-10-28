@@ -28,6 +28,7 @@ public class CapaStatusController(AppDbContext db) : ControllerBase
                 Id = s.Id,
                 Name = s.Name,
                 Description = s.Description,
+                HexaCode = s.HexaCode,
                 OrderIndex = s.OrderIndex,
                 IsTerminal = s.IsTerminal,
                 IsActive = s.IsActive,
@@ -58,6 +59,7 @@ public class CapaStatusController(AppDbContext db) : ControllerBase
         {
             Name = dto.Name,
             Description = dto.Description,
+            HexaCode = dto.HexaCode,
             OrderIndex = dto.OrderIndex,
             IsTerminal = dto.IsTerminal,
             IsActive = true,
@@ -72,6 +74,7 @@ public class CapaStatusController(AppDbContext db) : ControllerBase
             Id = status.Id,
             Name = status.Name,
             Description = status.Description,
+            HexaCode = status.HexaCode,
             OrderIndex = status.OrderIndex,
             IsTerminal = status.IsTerminal,
             IsActive = status.IsActive,
@@ -104,6 +107,7 @@ public class CapaStatusController(AppDbContext db) : ControllerBase
 
         status.Name = dto.Name;
         status.Description = dto.Description;
+        status.HexaCode = dto.HexaCode;
         status.OrderIndex = dto.OrderIndex;
         status.IsTerminal = dto.IsTerminal;
 
@@ -114,6 +118,7 @@ public class CapaStatusController(AppDbContext db) : ControllerBase
             Id = status.Id,
             Name = status.Name,
             Description = status.Description,
+            HexaCode = status.HexaCode,
             OrderIndex = status.OrderIndex,
             IsTerminal = status.IsTerminal,
             IsActive = status.IsActive,

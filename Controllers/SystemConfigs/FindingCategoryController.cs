@@ -26,6 +26,7 @@ public class FindingCategoryController(AppDbContext db) : ControllerBase
                 Id = c.Id,
                 Name = c.Name,
                 Description = c.Description,
+                HexaCode = c.HexaCode,
                 Severity = c.Severity,
                 RequiresImmediateAction = c.RequiresImmediateAction,
                 IsActive = c.IsActive,
@@ -50,6 +51,7 @@ public class FindingCategoryController(AppDbContext db) : ControllerBase
         {
             Name = dto.Name,
             Description = dto.Description,
+            HexaCode = dto.HexaCode,
             Severity = dto.Severity,
             RequiresImmediateAction = dto.RequiresImmediateAction,
             CreatedAt = DateTime.UtcNow
@@ -63,6 +65,7 @@ public class FindingCategoryController(AppDbContext db) : ControllerBase
             Id = category.Id,
             Name = category.Name,
             Description = category.Description,
+            HexaCode = category.HexaCode,
             Severity = category.Severity,
             RequiresImmediateAction = category.RequiresImmediateAction,
             IsActive = category.IsActive,
@@ -89,6 +92,7 @@ public class FindingCategoryController(AppDbContext db) : ControllerBase
 
         category.Name = dto.Name;
         category.Description = dto.Description;
+        category.HexaCode = dto.HexaCode;
         category.Severity = dto.Severity;
         category.RequiresImmediateAction = dto.RequiresImmediateAction;
 
@@ -99,6 +103,7 @@ public class FindingCategoryController(AppDbContext db) : ControllerBase
             Id = category.Id,
             Name = category.Name,
             Description = category.Description,
+            HexaCode = category.HexaCode,
             Severity = category.Severity,
             RequiresImmediateAction = category.RequiresImmediateAction,
             IsActive = category.IsActive,

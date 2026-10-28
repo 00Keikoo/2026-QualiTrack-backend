@@ -2,6 +2,7 @@ obj/
 bin/
 *.user
 *.sh
+*.sql
 .vs/
 .vscode/
 appsettings.Development.json

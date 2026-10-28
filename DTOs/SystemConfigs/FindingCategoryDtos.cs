@@ -10,6 +10,10 @@ public class CreateFindingCategoryDto
 
     [MaxLength(200, ErrorMessage = "Dekripsi maksimal 200 karakter")]
     public string Description { get; set; } = string.Empty;
+    
+    [Required(ErrorMessage = "Hexacode wajib diisi")]
+    [RegularExpression(@"^#[0-9A-Fa-f]{6}$", ErrorMessage = "HexaCode harus format hex yang valid (contoh: #FF5733)")]
+    public string HexaCode { get; set; } = "#808080";
 
     [Required(ErrorMessage = "Severity wajib diisi")]
     [Range(1, 5, ErrorMessage = "Severity harus antara 1-5 (1 = paling parah")]
@@ -27,6 +31,10 @@ public class UpdateFindingCategoryDto
     [MaxLength(200, ErrorMessage = "Deskripsi maksimal 200 karakter")]
     public string Description { get; set; } = string.Empty;
 
+    [Required(ErrorMessage = "Hexacode wajib diisi")]
+    [RegularExpression(@"^#[0-9A-Fa-f]{6}$", ErrorMessage = "HexaCode harus format hex yang valid (contoh: #FF5733)")]
+    public string HexaCode { get; set; } = "#808080";
+
     [Required(ErrorMessage = "Severity wajib diisi")]
     [Range(1, 5, ErrorMessage = "Severity harus antara 1 - 5")]
     public int Severity { get; set; }
@@ -39,6 +47,7 @@ public class FindingCategoryResponseDto
     public Guid Id { get; set; }
     public string Name { get; set; } = string.Empty;
     public string Description { get; set; } = string.Empty;
+    public string HexaCode { get; set; } = string.Empty;
     public int Severity { get; set; }
     public bool RequiresImmediateAction { get; set; }
     public bool IsActive { get; set; }

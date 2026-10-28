@@ -309,6 +309,10 @@ namespace QualiTrack.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
+                    b.Property<string>("HexaCode")
+                        .IsRequired()
+                        .HasColumnType("text");
+
                     b.Property<bool>("IsActive")
                         .HasColumnType("boolean");
 
@@ -587,6 +591,10 @@ namespace QualiTrack.Migrations
                         .HasColumnType("uuid");
 
                     b.Property<string>("Description")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("HexaCode")
                         .IsRequired()
                         .HasColumnType("text");
 
