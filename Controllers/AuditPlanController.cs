@@ -150,13 +150,13 @@ public class AuditPlanController : ControllerBase
             foreach (var scheduleDto in planDto.Schedules)
             {
                 if (!scheduleDto.ScheduledDate.HasValue)
-                    return BadRequest(new { message = $"ScheduledDate untuk Clause {scheduleDto.ClauseRef} wajib diisi." });
+                    return BadRequest(new { message = $"ScheduledDate untuk Clause {scheduleDto.ClauseRef} wajib dipilih." });
 
                 var auditor = await _db.Users
-                    .FirstOrDefaultAsync(u => u.FullName == scheduleDto.AuditorName);
+                    .FirstOrDefaultAsync(u => u.Id == scheduleDto.AuditorId);
                 if (auditor is null)
                 {
-                    return BadRequest(new { message = $"Auditor dengan nama {scheduleDto.AuditorName} tidak ditemukan" });
+                    return BadRequest(new { message = $"Auditor dengan nama {scheduleDto.AuditorId} tidak ditemukan" });
                 }
 
                 schedules.Add(new AuditSchedule
@@ -282,8 +282,8 @@ public class AuditPlanController : ControllerBase
             if (!dto.ScheduledDate.HasValue)
                 throw new InvalidOperationException($"ScheduledDate untuk Clause {dto.ClauseRef} wajib diisi.");
 
-            var auditor = await _db.Users.FirstOrDefaultAsync(u => u.FullName == dto.AuditorName)
-                ?? throw new InvalidOperationException($"Auditor dengan nama {dto.AuditorName} tidak ditemukan");
+            var auditor = await _db.Users.FirstOrDefaultAsync(u => u.Id == dto.AuditorId)
+                ?? throw new InvalidOperationException($"Auditor dengan nama {dto.AuditorId} tidak ditemukan");
 
             var date = DateTime.SpecifyKind(dto.ScheduledDate.Value, DateTimeKind.Utc);
             var existing = dto.Id.HasValue ? plan.Schedules.FirstOrDefault(s => s.Id == dto.Id.Value) : null;

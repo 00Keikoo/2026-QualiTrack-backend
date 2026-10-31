@@ -370,6 +370,9 @@ namespace QualiTrack.Migrations
 
                     b.HasIndex("IsoStandardId");
 
+                    b.HasIndex("Title", "DepartmentId")
+                        .IsUnique();
+
                     b.ToTable("Checklists");
                 });
 
