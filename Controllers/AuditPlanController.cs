@@ -227,8 +227,6 @@ public class AuditPlanController : ControllerBase
             return StatusCode(500, new { message = "Terjadi kesalahan internal saat mengupdate audit plan.", detail = ex.Message});
         }
 
-
-
     }
 
     [HttpDelete("{id}")]

@@ -62,17 +62,26 @@ public class SpcController(AppDbContext db) : ControllerBase
         var variance = data.Sum(x => Math.Pow(x - mean, 2)) / (data.Count - 1);
         var stdDev = Math.Sqrt(variance);
 
-        //Hitung UCL dan LCL (Mean ± 3*StdDev)
-        var ucl = mean + 3 * stdDev;
-        var lcl = mean - 3 * stdDev;
+        double ucl, lcl, cp, cpk;
+        if(stdDev == 0)
+        {
+            ucl = mean;
+            lcl = mean;
+            cp = 0;
+            cpk = 0;
+        }
+        else
+        {
+            ucl  = mean + 3 * stdDev;
+            lcl = mean - 3 * stdDev;
+            cp = (usl - lsl) / (6 * stdDev);
 
-        //Hitung Cp
-        var cp = (usl - lsl) / (6 * stdDev);
+            //Hitung Cpk
+            var cpkUpper = (usl - mean) / (3 * stdDev);
+            var cpkLower = (mean - lsl) / (3 * stdDev);
+            cpk = Math.Min(cpkUpper, cpkLower);
 
-        //Hitung Cpk
-        var cpkUpper = (usl - mean) / (3 * stdDev);
-        var cpkLower = (mean - lsl) / (3 * stdDev);
-        var cpk = Math.Min(cpkUpper, cpkLower);
+        }
 
         var isUnstable = data.Any(x => x >ucl || x < lcl);
         var outOfControlPoints = data.Where(x => x > ucl || x < lcl).ToList();
@@ -128,7 +137,10 @@ public class SpcController(AppDbContext db) : ControllerBase
             IsStable = analysis.IsStable,
             DataCount = analysis.DataCount,
             AnalyzedAt = analysis.AnalyzedAt,
-            Data = data.Select(d => Math.Round(d, 4)).ToList()
+            Data = data.Select(d => Math.Round(d, 4)).ToList(),
+            Target = analysis.Target,
+            Unit = analysis.Unit,
+            OutOfControlPoints = outOfControlPoints
         });
     }
 
@@ -209,7 +221,10 @@ public class SpcController(AppDbContext db) : ControllerBase
             DataCount = analysis.DataCount,
             AnalyzedAt = analysis.AnalyzedAt,
             IsStable = analysis.IsStable,
-            Data = analysis.DataPoints
+            Data = analysis.DataPoints,
+            Target = analysis.Target,
+            Unit = analysis.Unit,
+            OutOfControlPoints = analysis.DataPoints.Where(x => x > analysis.Ucl || x < analysis.Lcl).ToList()
         });
     }
 
