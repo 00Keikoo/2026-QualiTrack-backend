@@ -380,9 +380,9 @@ public class AdminController(AppDbContext db, IAdminActivityService activityServ
         var adminId = Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
 
         // Cek duplikat symbol
-        var symbolExists = await db.SpcUnits.AnyAsync(s => s.Symbol == req.Symbol);
-        if (symbolExists)
-            return BadRequest(new { message = "Symbol unit sudah digunakan" });
+        var nameExists = await db.SpcUnits.AnyAsync(s => s.Name == req.Name);
+        if (nameExists)
+            return BadRequest(new { message = "Nama unit sudah digunakan" });
 
         var unit = new SpcUnit
         {
@@ -427,8 +427,8 @@ public class AdminController(AppDbContext db, IAdminActivityService activityServ
             return NotFound(new { message = "SPC Unit tidak ditemukan" });
 
         // Cek duplikat symbol
-        var symbolExists = await db.SpcUnits.AnyAsync(s => s.Symbol == req.Symbol && s.Id != id);
-        if (symbolExists)
+        var nameExists = await db.SpcUnits.AnyAsync(s => s.Name == req.Name && s.Id != id);
+        if (nameExists)
             return BadRequest(new { message = "Symbol unit sudah digunakan" });
 
         unit.Name = req.Name;
