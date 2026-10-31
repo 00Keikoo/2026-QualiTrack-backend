@@ -47,6 +47,7 @@ public class CreateChecklistTemplateDto
     [MaxLength(200, ErrorMessage = "Judul maksimal 200 karakter")]
     public string Title { get; set; } = string.Empty;
 
+    [Required(ErrorMessage = "ISO Standard wajib dipilih")]
     public Guid? IsoStandardId { get; set; }
 
     [Required(ErrorMessage = "Department wajib dipilih")]
