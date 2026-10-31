@@ -131,17 +131,18 @@ public class ChecklistController(AppDbContext db) : ControllerBase
 
             if (dto.Items.Count > 0)
             {
-                foreach (var itemDto in dto.Items)
+                for (var i = 0; i < dto.Items.Count; i++)
                 {
+                    var itemDto = dto.Items[i];
                     var item = new ChecklistItem
                     {
                         ChecklistId = checklist.Id,
                         Question = itemDto.Question.Trim(),
                         Description = string.IsNullOrWhiteSpace(itemDto.Description)
-                            ? null
+                            ? null 
                             : itemDto.Description.Trim(),
                         ClauseRef = itemDto.ClauseRef.Trim(),
-                        OrderIndex = itemDto.OrderIndex
+                        OrderIndex = i + 1
                     };
                     db.ChecklistItems.Add(item);
                 }
@@ -173,6 +174,9 @@ public class ChecklistController(AppDbContext db) : ControllerBase
 
         if (checklist is null)
             return NotFound(new { message = "Checklist template tidak ditemukan" });
+
+        if (checklist.IsSystemTemplate)
+            return BadRequest(new { message = "Template sistem tidak dapat diubah" });
 
         if (dto.Items.Count == 0)
             return BadRequest(new { message = "Template harus memiliki minimal 1 item" });
@@ -208,6 +212,30 @@ public class ChecklistController(AppDbContext db) : ControllerBase
         checklist.Title = dto.Title.Trim();
         checklist.Standard = dto.Standard.Trim();
         checklist.Department = dto.Department.Trim();
+
+        if (dto.IsoStandardId.HasValue)
+        {
+            var isoExists = await db.IsoStandards
+                .AnyAsync(iso => iso.Id == dto.IsoStandardId && iso.IsActive);
+            if (!isoExists)
+                return BadRequest(new { message = "ISO Standard tidak valid "});
+
+            checklist.IsoStandardId = dto.IsoStandardId;
+            var iso = await db.IsoStandards.FindAsync(dto.IsoStandardId);
+            checklist.Standard = iso!.Code;
+        }
+
+        if (dto.DepartmentId.HasValue)
+        {
+            var deptExists = await db.Departments
+                .AnyAsync(d => d.Id == dto.DepartmentId && d.IsActive);
+            if (!deptExists)
+                return BadRequest(new { message = "Department tidak valid" });
+
+            checklist.DepartmentId = dto.DepartmentId;
+            var dept = await db.Departments.FindAsync(dto.DepartmentId);
+            checklist.Department = dept!.Name;
+        }
 
         for (var index = 0; index < dto.Items.Count; index++)
         {
@@ -254,6 +282,9 @@ public class ChecklistController(AppDbContext db) : ControllerBase
         var checklist = await db.Checklists.FindAsync(id);
         if (checklist is null)
             return NotFound(new { message = "Checklist template tidak ditemukan" });
+
+        if (checklist.IsSystemTemplate)
+            return BadRequest(new { message = "Template sistem tidak dapat dihapus" });
 
         db.Checklists.Remove(checklist);
         await db.SaveChangesAsync();

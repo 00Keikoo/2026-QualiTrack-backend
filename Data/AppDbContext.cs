@@ -93,6 +93,10 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             .HasForeignKey(c => c.DepartmentId)
             .IsRequired(false);
 
+        mb.Entity<Checklist>()
+            .HasIndex(c => new { c.Title, c.DepartmentId })
+            .IsUnique();
+
         // Department name dan code harus unik
         mb.Entity<Department>().HasIndex(d => d.Name).IsUnique();
         mb.Entity<Department>().HasIndex(d => d.Code).IsUnique();
