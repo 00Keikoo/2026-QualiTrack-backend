@@ -20,15 +20,19 @@ public class User
     public string PasswordHash { get; set; } = string.Empty;
     
     [Required(ErrorMessage = "Role wajib diisi")]
-    public string Role { get; set; } = "QualityManager";
+    public string Role { get; set; } = "Auditee";
     
     public string Status { get; set; } = UserStatus.Active;
 
     public bool EmailVerified { get; set; } = false;
-	
+    [JsonIgnore]
     public string? OtpCode { get; set; }
+    [JsonIgnore]
     public DateTime? OtpExpiry { get; set; }
+    [JsonIgnore]
+    public string? ResetToken { get; set; }
     public string? ProfilePhotoUrl { get; set; }    
+    [JsonIgnore]
     public string? PendingEmail { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 }

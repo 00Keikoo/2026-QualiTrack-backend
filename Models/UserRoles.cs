@@ -1,5 +1,3 @@
-using QualiTrack.Models;
-
 namespace QualiTrack.Models;
 
 public static class UserRoles
@@ -18,7 +16,7 @@ public static class UserRoles
 
     public static string NormalizeRole(string role)
     {
-        return role == "Auditor" ? AuditorInternal : role;
+        return role.Equals("Auditor", StringComparison.OrdinalIgnoreCase) ? AuditorInternal : role;
     }
 
     public static string GetClaimRole(string role)
@@ -28,10 +26,11 @@ public static class UserRoles
 }
 public static class UserStatuses
 {
+    public const string Pending = "Pending";
     public const string Active = "Active";
     public const string Inactive = "Inactive";
 
-    public static readonly string[] AllStatuses = { Active, Inactive };
+    public static readonly string[] AllStatuses = { Pending, Active, Inactive };
 
     public static bool IsValidStatus(string status)
     {

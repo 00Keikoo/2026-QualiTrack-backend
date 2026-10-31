@@ -6,7 +6,9 @@ using System.Text;
 using QualiTrack.Filters;
 using QualiTrack.Services;
 using System.Text.Json.Serialization;
+using System.Threading.RateLimiting;
 using DotNetEnv;
+using Microsoft.AspNetCore.RateLimiting;
 
 Env.Load();
 Env.TraversePath().Load();
@@ -112,6 +114,17 @@ builder.Services.AddControllers(options =>
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
+builder.Services.AddRateLimiter(options =>
+{
+    options.AddFixedWindowLimiter("otp", limiterOptions =>
+    {
+        limiterOptions.PermitLimit = 5;
+        limiterOptions.Window = TimeSpan.FromMinutes(5);
+        limiterOptions.QueueProcessingOrder = QueueProcessingOrder.OldestFirst;
+        limiterOptions.QueueLimit = 0;
+    });
+});
+
 var app = builder.Build();
 
 // Seed data checklist template
@@ -186,6 +199,7 @@ app.Use(async (context, next) =>
 });
 
 app.UseAuthentication();
+app.UseRateLimiter();
 app.UseAuthorization();
 app.MapControllers();
 app.Run();
