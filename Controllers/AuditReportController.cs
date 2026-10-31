@@ -6,6 +6,8 @@ using QualiTrack.Data;
 using QualiTrack.DTOs;
 using QualiTrack.Models;
 using QualiTrack.Services;
+using QualiTrack.Constants;
+using System.Collections.Concurrent;
 
 namespace QualiTrack.Controllers;
 
@@ -53,6 +55,22 @@ public class AuditReportController(
 
         var result = new List<AuditReportListItemDto>();
 
+        var parallelOptions = new ParallelOptions { MaxDegreeOfParallelism = 4};
+        var metadataResults = new ConcurrentDictionary<Guid, PdfReportMetadata>();
+
+        await Parallel.ForEachAsync(sessions, parallelOptions, async (s, ct) =>
+        {
+            try
+            {
+                var metadata = await pdfService.GetOrGeneratePdfMetadata(s.Id, s);
+                metadataResults.TryAdd(s.Id, metadata);
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(ex, "Failed to generate PDF metadata for session {SessionId}", s.Id);
+            }
+        });
+
         foreach (var s in sessions)
         {
             var item = new AuditReportListItemDto
@@ -69,22 +87,20 @@ public class AuditReportController(
                 CompletedAt = s.CompletedAt,
                 SummaryContent = s.Summary?.Content,
                 TotalFindings = s.Findings.Count,
-                TotalMajorNC = s.Findings.Count(f => f.Category!.Name == "MajorNC"),
-                TotalMinorNC = s.Findings.Count(f => f.Category!.Name == "MinorNC"),
+                TotalMajorNC = s.Findings.Count(f => f.Category!.Name == DefaultCategories.Major),
+                TotalMinorNC = s.Findings.Count(f => f.Category!.Name == DefaultCategories.Minor),
                 TotalCAPAs = s.Findings.Count(f => f.Capa != null),
                 ClosedCAPAs = s.Findings.Count(f => f.Capa != null && f.Capa.Status!.IsTerminal)
             };
 
-            try
+            if (metadataResults.TryGetValue(s.Id, out var metadata))
             {
-                var metadata = await pdfService.GetOrGeneratePdfMetadata(s.Id, s);
                 item.PageCount = metadata.PageCount;
                 item.FileSizeBytes = metadata.FileSizeBytes;
                 item.FileSizeFormatted = metadata.FileSizeFormatted;
             }
-            catch (Exception ex)
+            else
             {
-                logger.LogWarning(ex, "Failed to generate PDF metadata for session {SessionId}", s.Id);
                 item.PageCount = null;
                 item.FileSizeBytes = null;
                 item.FileSizeFormatted = null;

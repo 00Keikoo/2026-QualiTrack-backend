@@ -71,10 +71,29 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
         mb.Entity<AuditSession>().HasIndex(s => new { s.Status, s.CompletedAt });
 
         mb.Entity<EvidenceFile>()
-            .HasOne<Finding>()
+            .HasOne(e => e.Finding)
             .WithMany(f => f.Evidences)
             .HasForeignKey(e => e.FindingId)
+            .OnDelete(DeleteBehavior.Cascade)
             .IsRequired(false);
+
+        mb.Entity<EvidenceFile>()
+            .HasOne(e => e.AuditResponse)
+            .WithMany(r => r.Evidences)
+            .HasForeignKey(e => e.AuditResponseId)
+            .OnDelete(DeleteBehavior.Cascade)
+            .IsRequired(false);
+
+        mb.Entity<EvidenceFile>()
+            .HasOne(e => e.CapaAction)
+            .WithMany()
+            .HasForeignKey(e => e.CapaActionId)
+            .OnDelete(DeleteBehavior.Cascade)
+            .IsRequired(false);
+
+        mb.Entity<EvidenceFile>().HasIndex(e => e.FindingId);
+        mb.Entity<EvidenceFile>().HasIndex(e => e.AuditResponseId);
+        mb.Entity<EvidenceFile>().HasIndex(e => e.CapaActionId);
 
         // Simpan data points SPC sebagai JSON
         mb.Entity<SpcAnalysis>()

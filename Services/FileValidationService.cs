@@ -7,6 +7,24 @@ public class FileValidationService
     {
         ".jpg", ".jpeg", ".png", ".pdf"
     };
+
+    private bool ValidateMagicBytes(IFormFile file, string extension)
+    {
+        using var stream = file.OpenReadStream();
+        var buffer = new byte[8];
+        var bytesRead = stream.Read(buffer, 0, buffer.Length);
+
+        if (bytesRead < 4)
+            return false;
+
+        return extension.ToLowerInvariant() switch
+        {
+            ".jpg" or ".jpeg" => buffer[0] == 0xFF && buffer[1] == 0xD8 && buffer[2] == 0xFF,
+            ".png" => buffer[0] == 0x89 && buffer[1] == 0x50 && buffer[2] == 0x4E && buffer[3] == 0x47,
+            ".pdf" => buffer[0] == 0x25 && buffer[1] == 0x50 && buffer[2] == 0x44 && buffer[3] == 0x46, // %PDF
+            _ => true // Default allow untuk types lain
+        };
+    }
     
     public (bool IsValid, string ErrorMessage) Validate(IFormFile file)
     {
@@ -20,6 +38,10 @@ public class FileValidationService
         var extension = Path.GetExtension(file.FileName);
         if (string.IsNullOrEmpty(extension) || !AllowedExtensions.Contains(extension))
             return (false, $"Ekstensi file tidak diizinkan. Gunakan: {string.Join(", ", AllowedExtensions)}.");
+        
+        // Validasi magic bytes untuk prevent spoofing
+        if (!ValidateMagicBytes(file, extension))
+            return (false, "File tidak sesuai dengan tipe yang dideklarasikan.");
         
         return (true, string.Empty);
     }

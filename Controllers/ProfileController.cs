@@ -101,12 +101,21 @@ public class ProfileController : ControllerBase
         if (file == null || file.Length == 0)
             return BadRequest(new { message = "File tidak boleh kosong" });
 
+        // Validasi size (max 5MB untuk profile photo)
+        const long maxSizeBytes = 5 * 1024 * 1024;
+        if (file.Length > maxSizeBytes)
+            return BadRequest(new { message = $"Ukuran file maksimal {maxSizeBytes / (1024 * 1024)}MB"});
+
+        // Validasi ContentType
         var allowedTypes = new[] { "image/jpeg", "image/png", "image/jpg" };
         if (!allowedTypes.Contains(file.ContentType))
-            return BadRequest(new
-            {
-                message = "file harus berupa gambar (jpg / png)"
-            });
+            return BadRequest(new { message = "File harus berupa gambar (jpg/png/jpeg)"});
+
+        // Validasi ekstensi file
+        var allowedExtensions = new[] { ".jpg", ".jpeg", ".png"};
+        var extension = Path.GetExtension(file.FileName).ToLowerInvariant();
+        if (string.IsNullOrEmpty(extension) || !allowedExtensions.Contains(extension))
+            return BadRequest(new { message = "Ekstensi file tidak valid"});
 
         var userId = Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
         var user = await _db.Users.FindAsync(userId);

@@ -5,12 +5,16 @@ using Microsoft.EntityFrameworkCore;
 using QualiTrack.Data;
 using QualiTrack.Models;
 using QualiTrack.Services;
+using System.Security.Claims;
 
 namespace QualiTrack.Controllers;
 
 [ApiController]
 [Route("api/uploads")]
-public class UploadController(AppDbContext db, IStorageService storage ) : ControllerBase
+[Authorize]
+public class UploadController(AppDbContext db, 
+    IStorageService storage, 
+    FileValidationService fileValidation) : ControllerBase
 {
     private readonly string[] _allowedTypes = ["image/jpeg", "image/png", "image/jpg", "application/pdf"];
     private const int MaxImageWidth = 1280;
@@ -23,14 +27,9 @@ public class UploadController(AppDbContext db, IStorageService storage ) : Contr
         var finding = await db.Findings.FindAsync(findingId);
         if (finding is null) return NotFound("Finding tidak ditemukan");
 
-        if (file == null || file.Length == 0)
-            return BadRequest(new { message = "File tidak boleh kosong" });
-
-        if (file.Length > MaxFileSizeBytes)
-            return BadRequest(new { message = $"File terlalu besar. Maksimal {MaxFileSizeBytes / (1024 * 1024)}MB" });
-
-        if (!_allowedTypes.Contains(file.ContentType))
-            return BadRequest(new { message = "Format file tidak didukung. Gunakan JPG, PNG atau PDF" });
+        var (isValid, errorMessage) = fileValidation.Validate(file);
+        if (!isValid)
+            return BadRequest(new { message = errorMessage });
 
         var key = await storage.UploadFileAsync(file);
         if (key is null) return BadRequest(new { message = "Gagal menyimpan file" });
@@ -49,7 +48,8 @@ public class UploadController(AppDbContext db, IStorageService storage ) : Contr
         db.EvidenceFiles.Add(evidence);
         await db.SaveChangesAsync();
 
-        return Ok(new {
+        return Ok(new
+        {
             fileId = evidence.Id,
             fileName = evidence.FileName,
             url = storage.GetPresignedUrl(key),
@@ -62,14 +62,9 @@ public class UploadController(AppDbContext db, IStorageService storage ) : Contr
         var action = await db.CAPAActions.FindAsync(actionId);
         if (action is null) return NotFound("CAPA Action tidak ditemukan");
 
-        if (file == null || file.Length == 0)
-            return BadRequest(new { message = "File tidak boleh kosong" });
-
-        if (file.Length > MaxFileSizeBytes)
-            return BadRequest(new { message = $"File terlalu besar. Maksimal 10MB" });
-
-        if (!_allowedTypes.Contains(file.ContentType))
-            return BadRequest(new { message = "Format file tidak didukung. Gunakan JPG, PNG, atau PDF" });
+        var (isValid, errorMessage) = fileValidation.Validate(file);
+        if (!isValid)
+            return BadRequest(new { message = errorMessage });
 
         var key = await storage.UploadFileAsync(file);
         if (key is null) return BadRequest(new { message = "Gagal menyimpan file" });
@@ -88,7 +83,8 @@ public class UploadController(AppDbContext db, IStorageService storage ) : Contr
         db.EvidenceFiles.Add(evidence);
         await db.SaveChangesAsync();
 
-        return Ok(new {
+        return Ok(new
+        {
             fileId = evidence.Id,
             fileName = evidence.FileName,
             url = storage.GetPresignedUrl(key),
@@ -115,11 +111,44 @@ public class UploadController(AppDbContext db, IStorageService storage ) : Contr
     }
 
     [HttpDelete("{fileId}")]
-    [Authorize]
     public async Task<IActionResult> Delete(Guid fileId)
     {
-        var evidence = await db.EvidenceFiles.FindAsync(fileId);
-        if (evidence is null) return NotFound(new { message = "File tidak ditemukan" });
+        var userId = Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
+        var userRole = User.FindFirst(ClaimTypes.Role)?.Value;
+
+        var evidence = await db.EvidenceFiles
+            .Include(e => e.Finding)
+            .Include(e => e.AuditResponse)
+                .ThenInclude(r => r!.Session)
+                    .ThenInclude(s => s.Schedule)
+            .Include(e => e.CapaAction)
+                .ThenInclude(a => a!.Capa)
+            .FirstOrDefaultAsync(e => e.Id == fileId);
+
+        if (evidence is null)
+            return NotFound(new { message = "File tidak ditemukan" });
+
+        // Validasi ownership berdasarkan relasi
+        var canDelete = userRole == "Admin" || userRole =="QualityManager";
+        if (!canDelete && evidence.FindingId.HasValue)
+        {
+            var finding = evidence.Finding;
+            canDelete = finding?.ReporterId == userId;
+        }
+
+        if (!canDelete && evidence.AuditResponseId.HasValue)
+        {
+            var response = evidence.AuditResponse;
+            canDelete = response?.Session?.Schedule?.AuditorId == userId;
+        }
+
+        if (!canDelete && evidence.CapaActionId.HasValue)
+        {
+            var action = evidence.CapaAction;
+            canDelete = action?.Capa?.PicId == userId;
+        }
+        if (!canDelete)
+            return Forbid();
 
         if (!string.IsNullOrEmpty(evidence.StoragePath))
             await storage.DeleteFileAsync(evidence.StoragePath);
@@ -135,7 +164,7 @@ public class UploadController(AppDbContext db, IStorageService storage ) : Contr
     public async Task<IActionResult> GetFileById(Guid fileId)
     {
         var evidence = await db.EvidenceFiles.FindAsync(fileId);
-        if(evidence is null) return NotFound(new { message = "File tidak ditemukan"});
+        if (evidence is null) return NotFound(new { message = "File tidak ditemukan" });
         return Ok(new
         {
             fileId = evidence.Id,
@@ -158,14 +187,9 @@ public class UploadController(AppDbContext db, IStorageService storage ) : Contr
         if (response.Answer != ResponseAnswer.Conform)
             return BadRequest(new { message = "Upload evidence hanya untuk jawaban PASS" });
 
-        if (file == null || file.Length == 0)
-            return BadRequest(new { message = "File tidak boleh kosong" });
-
-        if (file.Length > MaxFileSizeBytes)
-            return BadRequest(new { message = $"File terlalu besar. Maksimal {MaxFileSizeBytes / (1024 * 1024)}MB" });
-
-        if (!_allowedTypes.Contains(file.ContentType))
-            return BadRequest(new { message = "Format file tidak didukung. Gunakan JPG, PNG, atau PDF" });
+        var (isValid, errorMessage) = fileValidation.Validate(file);
+        if (!isValid)
+            return BadRequest(new { message = errorMessage });
 
         var key = await storage.UploadFileAsync(file);
         if (key is null) return BadRequest(new { message = "Gagal menyimpan file" });

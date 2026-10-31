@@ -6,6 +6,8 @@ using QuestPDF.Infrastructure;
 using Microsoft.Extensions.Logging;
 using QualiTrack.Constants;
 using QualiTrack.Models;
+using System.Collections.Concurrent;
+using System.Threading;
 
 namespace QualiTrack.Services;
 
@@ -21,9 +23,14 @@ public class PdfReportService(
     IHttpClientFactory httpClientFactory,
     ILogger<PdfReportService> logger)
 {
+    private static readonly ConcurrentDictionary<Guid, SemaphoreSlim> _pdfLocks = new();
     public async Task<byte[]> GenerateAuditReport(AuditSession session)
     {
-        QuestPDF.Settings.License = LicenseType.Community;
+        if (session.Schedule == null)
+            throw new InvalidOperationException($"Session {session.Id} tidak memiliki Schedule");
+        
+        if (session.Schedule.AuditPlan == null)
+            throw new InvalidOperationException($"Schedule untuk session {session.Id} tidak memiliki AuditPlan");
 
         var schedule = session.Schedule;
         var plan = schedule.AuditPlan;
@@ -83,22 +90,35 @@ public class PdfReportService(
     {
         try
         {
-            // Local - baca dari disk
-            var localPath = Path.Combine(env.ContentRootPath, "uploads", Path.GetFileName(storagePath));
-            if(File.Exists(localPath))
-                return await File.ReadAllBytesAsync(localPath);
-
-            // S3 - download via presignet URL
-            var url = storage.GetPresignedUrl(storagePath);
-            var client = httpClientFactory.CreateClient();
-            var response = await client.GetAsync(url);
-            if(response.IsSuccessStatusCode)
-                return await response.Content.ReadAsByteArrayAsync();
-
-            return null;
+            // Cek storage type untuk determine strategy
+            if (storage is LocalStorageService)
+            {
+                // LocalStorageService: baca langsung dari disl
+                var fileName = Path.GetFileName(storagePath);
+                var localPath = Path.Combine(env.ContentRootPath, "uploads", fileName);
+                if (File.Exists(localPath))
+                    return await File.ReadAllBytesAsync(localPath);
+                logger.LogWarning("Local file not found: {Path}", localPath);
+                return null;
+            }
+            else
+            {
+                // S3StorageService: download via presigned URL
+                var url = storage.GetPresignedUrl(storagePath);
+                var client = httpClientFactory.CreateClient();
+                var response = await client.GetAsync(url);
+                if (response.IsSuccessStatusCode)
+                    return await response.Content.ReadAsByteArrayAsync();
+                
+                logger.LogWarning("Failed to download from S3: {Url}, Status: {StatusCode}",
+                    url, response.StatusCode);
+                
+                return null;
+            }
         }
-        catch
+        catch (Exception ex)
         {
+            logger.LogWarning(ex, "Exception while fetching image from {StoragePath}", storagePath);
             return null;
         }
     }
@@ -197,7 +217,12 @@ public class PdfReportService(
 
             //EVIDENCE DOCUMENTATION
             var passResponses = responses.Where(r => r.Answer == ResponseAnswer.Conform && r.Evidences != null && r.Evidences.Any()).ToList();
-            var failFindings = findings.Where(f => f.Category!.Name == "MajorNC" || f.Category.Name == "MinorNC" || f.Category.Name == "OFI").ToList();
+            var failFindings = findings.Where(f =>
+                f.Category != null && (
+                    f.Category.Name == DefaultCategories.Major || 
+                    f.Category.Name == DefaultCategories.Minor ||
+                    f.Category.Name == DefaultCategories.Observation
+                )).ToList();
 
             if (passResponses.Any() || failFindings.Any())
             {
@@ -236,7 +261,7 @@ public class PdfReportService(
                             s.Item().PaddingTop(8).Column(fc =>
                             {
                                 fc.Item().Text(f.Title).FontSize(11).Bold().FontColor("#c62828");
-                                fc.Item().Text($"Category: {f.Category}").FontSize(9).FontColor("#555555");
+                                fc.Item().Text($"Category: {f.Category?.Name ?? "Unknown"}").FontSize(9).FontColor("#555555");
                                 fc.Item().PaddingTop(2).Text($"Note: {f.Description}").FontSize(9);
 
                                 var findingEvidences = f.Evidences?.ToList() ?? [];
@@ -289,10 +314,23 @@ public class PdfReportService(
     public async Task<PdfReportMetadata> GetOrGeneratePdfMetadata(Guid sessionId, AuditSession? session = null)
     {
         var pdfPath = GetPdfFilePath(sessionId);
-        if (!File.Exists(pdfPath))
+
+        var lockObj = _pdfLocks.GetOrAdd(sessionId, _ => new SemaphoreSlim(1, 1));
+        var shouldRegenerate = !File.Exists(pdfPath);
+
+        // Invalidasi cache jika session.UpdateAt lebih baru dari file
+        if (!shouldRegenerate && session != null)
         {
-            await GenerateAndSavePdfAsync(sessionId, session, pdfPath);
+            var fileInfo = new FileInfo(pdfPath);
+            var sessionLastModified = session.CompletedAt ?? session.StartedAt;
+            if (fileInfo.LastWriteTimeUtc < sessionLastModified)
+            {
+                shouldRegenerate = true;
+            }
         }
+
+        if (shouldRegenerate)
+            await GenerateAndSavePdfAsync(sessionId, session, pdfPath);
 
         return await ExtractPdfMetadataAsync(pdfPath);
     }
@@ -300,7 +338,9 @@ public class PdfReportService(
     private string GetPdfFilePath(Guid sessionId)
     {
         var fileName = $"{FileConstants.AuditReportFilePrefix}{sessionId}{FileConstants.AuditReportFileExtension}";
-        return Path.Combine(env.ContentRootPath, FileConstants.UploadsFolder, fileName);
+        var privateFolder = Path.Combine(env.ContentRootPath, "private-reports");
+        Directory.CreateDirectory(privateFolder);
+        return Path.Combine(privateFolder, fileName);
     }
 
     private async Task GenerateAndSavePdfAsync(Guid sessionId, AuditSession? session, string pdfPath)
@@ -314,7 +354,13 @@ public class PdfReportService(
         try
         {
             var pdfBytes = await GenerateAuditReport(session);
-            await File.WriteAllBytesAsync(pdfPath, pdfBytes);
+
+            // Write ke temp file dulu, baru rename (atomic operation)
+            var tempPath = $"{pdfPath}.tmp";
+            await File.WriteAllBytesAsync(tempPath, pdfBytes);
+
+            // File.Move atomic di most filesystems
+            File.Move(tempPath, pdfPath, overwrite: true);
             logger.LogInformation("PDF generated succesfully for session {SessionId} at {Path}", sessionId, pdfPath);
         }
         catch (Exception ex)

@@ -9,8 +9,12 @@ public class EvidenceFile
     public string ContentType { get; set; } = string.Empty;
     public long FileSizeBytes { get; set; }
     public DateTime UploadedAt { get; set; } = DateTime.UtcNow;
+    // Foreign Keys
     public Guid? FindingId { get; set; } 
-    // Polymorphic — salah satu dari dua ini diisi
     public Guid? AuditResponseId { get; set; }
     public Guid? CapaActionId { get; set; }
+    // Navigation Properties
+    public Finding? Finding { get; set; }
+    public AuditResponse? AuditResponse { get; set; }
+    public CAPAAction? CapaAction { get; set; }
 }

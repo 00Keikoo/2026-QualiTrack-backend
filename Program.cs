@@ -12,6 +12,7 @@ Env.Load();
 Env.TraversePath().Load();
 
 AppContext.SetSwitch("Npgsql.EnableLegacyTimestampBehavior", true);
+QuestPDF.Settings.License = QuestPDF.Infrastructure.LicenseType.Community;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -91,6 +92,7 @@ builder.WebHost.ConfigureKestrel(o => o.Limits.MaxRequestBodySize = 10 * 1024 * 
 
 builder.Services.AddScoped<ValidateUserFilter>();
 builder.Services.AddScoped<PdfReportService>();
+builder.Services.AddScoped<FileValidationService>();
 
 builder.Services.AddHttpClient();
 

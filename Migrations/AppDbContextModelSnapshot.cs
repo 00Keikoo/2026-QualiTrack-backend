@@ -485,6 +485,9 @@ namespace QualiTrack.Migrations
                     b.Property<Guid?>("AuditResponseId")
                         .HasColumnType("uuid");
 
+                    b.Property<Guid?>("CAPAActionId")
+                        .HasColumnType("uuid");
+
                     b.Property<Guid?>("CapaActionId")
                         .HasColumnType("uuid");
 
@@ -512,6 +515,8 @@ namespace QualiTrack.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("AuditResponseId");
+
+                    b.HasIndex("CAPAActionId");
 
                     b.HasIndex("CapaActionId");
 
@@ -1003,17 +1008,30 @@ namespace QualiTrack.Migrations
 
             modelBuilder.Entity("QualiTrack.Models.EvidenceFile", b =>
                 {
-                    b.HasOne("QualiTrack.Models.AuditResponse", null)
+                    b.HasOne("QualiTrack.Models.AuditResponse", "AuditResponse")
                         .WithMany("Evidences")
-                        .HasForeignKey("AuditResponseId");
+                        .HasForeignKey("AuditResponseId")
+                        .OnDelete(DeleteBehavior.Cascade);
 
                     b.HasOne("QualiTrack.Models.CAPAAction", null)
                         .WithMany("Evidences")
-                        .HasForeignKey("CapaActionId");
+                        .HasForeignKey("CAPAActionId");
 
-                    b.HasOne("QualiTrack.Models.Finding", null)
+                    b.HasOne("QualiTrack.Models.CAPAAction", "CapaAction")
+                        .WithMany()
+                        .HasForeignKey("CapaActionId")
+                        .OnDelete(DeleteBehavior.Cascade);
+
+                    b.HasOne("QualiTrack.Models.Finding", "Finding")
                         .WithMany("Evidences")
-                        .HasForeignKey("FindingId");
+                        .HasForeignKey("FindingId")
+                        .OnDelete(DeleteBehavior.Cascade);
+
+                    b.Navigation("AuditResponse");
+
+                    b.Navigation("CapaAction");
+
+                    b.Navigation("Finding");
                 });
 
             modelBuilder.Entity("QualiTrack.Models.Finding", b =>
