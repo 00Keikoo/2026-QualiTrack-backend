@@ -55,8 +55,9 @@ public class UserController : ControllerBase
     public async Task<IActionResult> GetAuditors()
     {
         var auditors = await _db.Users
-            .Where(u => u.EmailVerified == true && (u.Role == UserRoles.AuditorInternal ||
-                u.Role == UserRoles.QualityManager))
+            .Where(u => u.EmailVerified == true 
+            && u.Status == "Active" 
+            && u.Role == UserRoles.AuditorInternal )
             .Select(u => new { u.Id, u.FullName, u.Role })
             .ToListAsync();
 
