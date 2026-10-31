@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Filters;
 using Microsoft.EntityFrameworkCore;
 using QualiTrack.Data;
+using QualiTrack.Constants;
 using System.Security.Claims;
 
 namespace QualiTrack.Filters;
@@ -21,12 +22,12 @@ public class ValidateUserFilter : IAsyncActionFilter
 
         if (userIdClaim != null && Guid.TryParse(userIdClaim, out var userId))
         {
-            var userExists = await _db.Users.AnyAsync(u => u.Id == userId);
+            var userExists = await _db.Users.AnyAsync(u => u.Id == userId && u.Status == UserStatus.Active && u.EmailVerified == true);
             if (!userExists)
             {
-                context.Result = new UnauthorizedObjectResult(new 
-                { 
-                    message = "Akun tidak ditemukan atau telah dihapus" 
+                context.Result = new UnauthorizedObjectResult(new
+                {
+                    message = "Akun tidak ditemukan atau telah dihapus"
                 });
                 return;
             }

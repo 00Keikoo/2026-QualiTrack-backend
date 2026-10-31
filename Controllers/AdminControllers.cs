@@ -7,6 +7,7 @@ using QualiTrack.DTOs;
 using QualiTrack.Filters;
 using QualiTrack.Services;
 using System.Security.Claims;
+using QualiTrack.Constants;
 
 namespace QualiTrack.Controllers;
 
@@ -94,8 +95,6 @@ public class AdminController(AppDbContext db, IAdminActivityService activityServ
     [HttpPut("users/{id}")]
     public async Task<IActionResult> UpdateUser(Guid id, [FromBody] UpdateUserRequest req)
     {
-        var currentUserId = Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
-
         var user = await db.Users.FindAsync(id);
         if (user is null)
             return NotFound(new { message = "User tidak ditemukan" });
@@ -128,6 +127,9 @@ public class AdminController(AppDbContext db, IAdminActivityService activityServ
         if (user is null)
             return NotFound(new { message = "User tidak ditemukan" });
 
+        if (user.Status != UserStatus.Active)
+            return BadRequest(new { message = "Tidak dapat mengubah role user yang tidak aktif" });
+
         // Admin tidak boleh ubah role Admin lain
         if (user.Role == UserRoles.Admin)
             return BadRequest(new { message = "Admin tidak dapat mengubah role Admin lain" });
@@ -157,27 +159,34 @@ public class AdminController(AppDbContext db, IAdminActivityService activityServ
         if (id == currentUserId)
             return BadRequest(new { message = "Admin tidak dapat mengubah status dirinya sendiri" });
 
-        var user = await db.Users.FindAsync(id);
-        if (user is null)
-            return NotFound(new { message = "User tidak ditemukan" });
+        using var transaction = await db.Database.BeginTransactionAsync();
+        try
+        {
+            var user = await db.Users.FindAsync(id);
+            if (user is null)
+                return NotFound(new { message = "User tidak ditemukan" });
 
-        // Admin tidak boleh nonaktifkan Admin lain
-        if (user.Role == UserRoles.Admin)
-            return BadRequest(new { message = "Admin tidak dapat mengubah status Admin lain" });
+            // Admin tidak boleh nonaktifkan admin lain
+            if (user.Role == UserRoles.Admin)
+                return BadRequest(new { message = "Admin tidak dapat mengubah status Admin lain"});
 
-        if (!ValidStatuses.Contains(req.Status))
-            return BadRequest(new { message = "Status tidak valid. Pilih: Active atau Inactive" });
+            if (!ValidStatuses.Contains(req.Status))
+                return BadRequest(new { message = "Status tidak valid. Pilih: Active atau Inactive" });
 
-        user.Status = req.Status;
-        await db.SaveChangesAsync();
+            user.Status = req.Status;
+            await db.SaveChangesAsync();
+            await transaction.CommitAsync();
 
-        return Ok(new { message = $"Status user berhasil diubah menjadi {req.Status}" });
+            return Ok(new { message = $"Status user berhasil diubah menjadi {req.Status}" });
+        }
+        catch
+        {
+            await transaction.RollbackAsync();
+            throw;
+        }
     }
 
-    // ============================================================
     // ISO STANDARD MANAGEMENT
-    // ============================================================
-
     // GET /api/admin/iso-standards
     [HttpGet("iso-standards")]
     public async Task<IActionResult> GetIsoStandards([FromQuery] bool? isActive)

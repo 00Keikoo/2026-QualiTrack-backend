@@ -29,9 +29,11 @@ public class UpdateUserStatusRequest
 public class UpdateUserRequest
 {
     [Required(ErrorMessage = "Nama wajib diisi")]
+    [StringLength(200, ErrorMessage = "Nama maksimal 200 karakter")]
     public string FullName { get; set; } = string.Empty;
 
     [Required(ErrorMessage = "Email wajib diisi")]
     [EmailAddress(ErrorMessage = "Format email tidak valid")]
+    [StringLength(255, ErrorMessage = "Email maksimal 255 karakter")]
     public string Email { get; set; } = string.Empty;
 }

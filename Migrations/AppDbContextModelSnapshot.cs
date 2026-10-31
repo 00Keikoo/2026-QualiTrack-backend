@@ -823,6 +823,9 @@ namespace QualiTrack.Migrations
                     b.Property<string>("ProfilePhotoUrl")
                         .HasColumnType("text");
 
+                    b.Property<string>("ResetToken")
+                        .HasColumnType("text");
+
                     b.Property<string>("Role")
                         .IsRequired()
                         .HasColumnType("text");

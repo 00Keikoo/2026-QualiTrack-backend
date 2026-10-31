@@ -30,16 +30,8 @@ public class UserController : ControllerBase
 
         if (!string.IsNullOrEmpty(role))
         {
-            var normalizedRole = role == UserRoles.AuditorInternal ?
-              UserRoles.AuditorInternal : role;
-            if (normalizedRole == UserRoles.AuditorInternal)
-            {
-                query = query.Where(u => u.Role == UserRoles.AuditorInternal);
-            }
-            else
-            {
-                query = query.Where(u => u.Role == normalizedRole);
-            }
+            var normalizedRole = UserRoles.NormalizeRole(role);
+            query = query.Where(u => u.Role == normalizedRole);
         }
 
         var users = await query
@@ -55,9 +47,9 @@ public class UserController : ControllerBase
     public async Task<IActionResult> GetAuditors()
     {
         var auditors = await _db.Users
-            .Where(u => u.EmailVerified == true 
-            && u.Status == "Active" 
-            && u.Role == UserRoles.AuditorInternal )
+            .Where(u => u.EmailVerified == true
+            && u.Status == "Active"
+            && u.Role == UserRoles.AuditorInternal)
             .Select(u => new { u.Id, u.FullName, u.Role })
             .ToListAsync();
 

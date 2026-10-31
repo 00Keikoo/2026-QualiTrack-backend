@@ -12,6 +12,7 @@ using QualiTrack.Models;
 using QualiTrack.Services;
 using QualiTrack.Filters;
 using QualiTrack.Constants;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace QualiTrack.Controllers;
 
@@ -105,6 +106,7 @@ public class AuthController(AppDbContext db, IConfiguration config, IEmailServic
         });
     }
 
+    [EnableRateLimiting("otp")]
     [HttpPost("verify-email")]
     public async Task<IActionResult> VerifyEmail([FromBody] VerifyEmailRequest req)
     {
@@ -160,6 +162,9 @@ public class AuthController(AppDbContext db, IConfiguration config, IEmailServic
         if (!user.EmailVerified)
             return Unauthorized(new { message = "Email belum diverifikasi. Cek inbox email kamu." });
 
+        if (user.Status != UserStatus.Active)
+            return Unauthorized(new { message = "Akun tidak aktif. Hubungi adminstrator"});
+
         var token = GenerateJwt(user);
         return Ok(new AuthResponse(token, UserRoles.GetClaimRole(user.Role), user.FullName));
     }
@@ -196,6 +201,7 @@ public class AuthController(AppDbContext db, IConfiguration config, IEmailServic
         return Ok(new { message = "Password berhasil diubah" });
     }
 
+    [EnableRateLimiting("otp")]
     [HttpPost("forgot-password/request-otp")]
     public async Task<IActionResult> RequestOtp([FromBody] RequestOtpRequest req)
     {
@@ -225,7 +231,8 @@ public class AuthController(AppDbContext db, IConfiguration config, IEmailServic
             return BadRequest(new { message = "OTP tidak valid" });
 
         var resetToken = Guid.NewGuid().ToString();
-        user.OtpCode = resetToken;
+        user.ResetToken = resetToken;
+        user.OtpCode = null;
         user.OtpExpiry = DateTime.UtcNow.AddMinutes(ResetTokenExpiryMinutes);
         await db.SaveChangesAsync();
 
@@ -239,13 +246,13 @@ public class AuthController(AppDbContext db, IConfiguration config, IEmailServic
         if (user is null)
             return NotFound(new { message = "Email tidak ditemukan" });
 
-        if (user.OtpCode is null || user.OtpExpiry is null)
+        if (user.ResetToken is null || user.OtpExpiry is null)
             return BadRequest(new { message = "Reset token tidak valid" });
 
         if (DateTime.UtcNow > user.OtpExpiry)
             return BadRequest(new { message = "Reset token sudah kadaluarsa" });
 
-        if (user.OtpCode != req.ResetToken)
+        if (user.ResetToken != req.ResetToken)
             return BadRequest(new { message = "Reset token tidak valid" });
 
         if (req.NewPassword.Length < 6)
@@ -255,6 +262,7 @@ public class AuthController(AppDbContext db, IConfiguration config, IEmailServic
             return BadRequest(new { message = "Password dan konfirmasi password tidak sama" });
 
         user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(req.NewPassword);
+        user.ResetToken = null;
         user.OtpCode = null;
         user.OtpExpiry = null;
         await db.SaveChangesAsync();
@@ -273,11 +281,13 @@ public class AuthController(AppDbContext db, IConfiguration config, IEmailServic
         var emailTaken = await db.Users.AnyAsync(u => u.Email == req.NewEmail && u.Id != userId);
         if (emailTaken) return BadRequest(new { message = "Email sudah digunakan oleh akun lain" });
 
-        await GenerateAndSendOtpAsync(user, user.Email);
+        user.PendingEmail = req.NewEmail;
+        await GenerateAndSendOtpAsync(user, req.NewEmail);
 
         return Ok(new { message = $"OTP telah dikirim ke {req.NewEmail}. Berlaku 5 menit." });
     }
 
+    [EnableRateLimiting("otp")]
     [HttpPost("verify-email-change")]
     [Authorize]
     public async Task<IActionResult> VerifyEmailChange([FromBody] VerifyEmailChangeRequest req)
