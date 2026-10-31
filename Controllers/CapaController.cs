@@ -76,7 +76,9 @@ public class CapaController(AppDbContext db) : ControllerBase
     {
         var capa = await db.CAPAs
             .Include(c => c.Actions)
+                .ThenInclude(a => a.DoneBy)
             .Include(c => c.CloseOut)
+                .ThenInclude(co => co!.VerifiedBy)
             .Include(c => c.Pic)
             .Include(c => c.Status)
             .Include(c => c.Finding!)
@@ -205,6 +207,9 @@ public class CapaController(AppDbContext db) : ControllerBase
         if (newStatus == null || !newStatus.IsActive)
             return BadRequest(new { message = "Status tidak valid" });
 
+        if (User.IsInRole("Auditee") && newStatus.IsTerminal)
+            return BadRequest(new { message = "Auditee tidak dapat mengubah status ke terminal. Gunakan CloseOut untuk menutup CAPA." });
+
         capa.StatusId = statusId;
         await db.SaveChangesAsync();
 
@@ -215,7 +220,10 @@ public class CapaController(AppDbContext db) : ControllerBase
     [Authorize(Roles = "Admin,QualityManager,AuditorInternal,Auditee")]
     public async Task<IActionResult> AddAction(Guid id, [FromBody] AddCapaActionRequest req)
     {
-        var capa = await db.CAPAs.FindAsync(id);
+        var capa = await db.CAPAs
+            .Include(c => c.Status)
+            .FirstOrDefaultAsync(c => c.Id == id);
+
         if (capa is null) return NotFound(new { message = "CAPA tidak ditemukan"});
         if (User.IsInRole("Auditee"))
         {
@@ -224,6 +232,17 @@ public class CapaController(AppDbContext db) : ControllerBase
         }
         if (!req.DoneById.HasValue || req.DoneById == Guid.Empty)
             return BadRequest(new { message = "DoneById harus diisi dan bukan Guid kosong" });
+
+        if (User.IsInRole("Auditee"))
+        {
+            var userId = Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
+            if ( req.DoneById != userId)
+                return BadRequest(new { message = "Auditee hanya dapat menambahkan action atas nama sendiri" });
+        }
+
+        var doneByUser = await db.Users.FindAsync(req.DoneById.Value);
+        if (doneByUser == null || doneByUser.Status != UserStatus.Active)
+            return BadRequest(new { message = "User yang ditugaskan tidak valid atau tidak aktif" });
 
         var action = new CAPAAction
         {
@@ -238,7 +257,7 @@ public class CapaController(AppDbContext db) : ControllerBase
         if (!capa.Status!.IsTerminal)
         {
             var inProgressStatus = await db.CapaStatuses
-                .FirstOrDefaultAsync(s => s.Name == "InProgress");
+                .FirstOrDefaultAsync(s => s.Name == DefaultStatuses.InProgress);
             if (inProgressStatus != null)
                 capa.StatusId = inProgressStatus.Id;
         }
@@ -258,7 +277,7 @@ public class CapaController(AppDbContext db) : ControllerBase
     }
 
     [HttpPost("{id}/closeout")]
-    [Authorize(Roles = "Admin,QualityManager,AuditorInternal,Auditee")]
+    [Authorize(Roles = "Admin,QualityManager,AuditorInternal")]
     public async Task<IActionResult> CloseOut(Guid id, [FromBody] CloseOutVerificationRequest req)
     {
         var capa = await db.CAPAs.FirstOrDefaultAsync(c => c.Id == id);
@@ -269,6 +288,15 @@ public class CapaController(AppDbContext db) : ControllerBase
             var userId = Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
             if (capa.PicId != userId) return Forbid();
         }
+        if (capa.PicId == req.VerifiedById)
+            return BadRequest(new { message = "PIC tidak boleh memverifikasi CAPA sendiri" });
+
+        var existingCloseOut = await db.CloseOutVerifications
+            .AnyAsync(co => co.CapaId == id);
+
+        if (existingCloseOut)
+            return BadRequest(new { message = "Capa sudah memiliki verifikasi CloseOut" });
+
         if (!req.IsEffective.HasValue)
             return BadRequest(new { message = "IsEffective wajib diisi" });
         if (!req.VerifiedById.HasValue || req.VerifiedById == Guid.Empty)
@@ -284,22 +312,35 @@ public class CapaController(AppDbContext db) : ControllerBase
             VerifiedAt = DateTime.UtcNow
         };
 
-        db.CloseOutVerifications.Add(verification);
+        using var transaction = await db.Database.BeginTransactionAsync();
+        try
+        {
+            db.CloseOutVerifications.Add(verification);
 
-        var closedStatus = await db.CapaStatuses
-            .FirstOrDefaultAsync(s => s.IsTerminal == true);
+            var closedStatus = await db.CapaStatuses
+                .FirstOrDefaultAsync(s => s.IsTerminal == true && s.IsActive);
 
-        if (closedStatus == null)
-            return BadRequest(new { message = "Status closed tidak ditemukan" });
+            if (closedStatus == null)
+            {
+                await transaction.RollbackAsync();
+                return BadRequest(new { message = "Status closed tidak ditemukan" });
+            }
 
-        capa.StatusId = closedStatus.Id;
-        capa.ClosedAt = DateTime.UtcNow;
+            capa.StatusId = closedStatus.Id;
+            capa.ClosedAt = DateTime.UtcNow;
 
-        await db.Findings
-            .Where(f => f.Id == capa.FindingId)
-            .ExecuteUpdateAsync(f => f.SetProperty(f => f.Status, FindingStatus.Closed));
+            await db.Findings
+                .Where(f => f.Id == capa.FindingId)
+                .ExecuteUpdateAsync(f => f.SetProperty(f => f.Status, FindingStatus.Closed));
 
-        await db.SaveChangesAsync();
+            await db.SaveChangesAsync();
+            await transaction.CommitAsync();
+        }
+        catch
+        {
+            await transaction.RollbackAsync();
+            throw;
+        }
 
         var verifiedBy = await db.Users.FindAsync(req.VerifiedById.Value);
         var response = new CloseOutResponseDto
