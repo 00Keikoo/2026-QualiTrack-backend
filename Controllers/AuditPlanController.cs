@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using System.Security.Claims;
@@ -185,34 +186,49 @@ public class AuditPlanController : ControllerBase
     [Authorize(Roles = "Admin,QualityManager")]
     public async Task<IActionResult> Update(Guid id, [FromBody] UpdateAuditPlanDto updatedPlanDto)
     {
-        var plan = await _db.AuditPlans
+        using var transaction = await _db.Database.BeginTransactionAsync();
+        try
+        {
+            var plan = await _db.AuditPlans
             .Include(a => a.Schedules)
             .FirstOrDefaultAsync(a => a.Id == id);
 
-        if (plan is null)
-            return NotFound(new { message = $"Audit plan dengan ID {id} tidak ditemukan", id = id });
+            if (plan is null)
+                return NotFound(new { message = $"Audit plan dengan ID {id} tidak ditemukan", id = id });
 
-        plan.Title = updatedPlanDto.Title;
-        plan.Year = updatedPlanDto.Year;
-        plan.Standard = updatedPlanDto.Standard;
-        plan.Description = updatedPlanDto.Description;
-        plan.Priority = updatedPlanDto.Priority;
+            plan.Title = updatedPlanDto.Title;
+            plan.Year = updatedPlanDto.Year;
+            plan.Standard = updatedPlanDto.Standard;
+            plan.Description = updatedPlanDto.Description;
+            plan.Priority = updatedPlanDto.Priority;
 
-        if (updatedPlanDto.Schedules is not null)
+            
+            if (updatedPlanDto.Schedules is not null)
+            {
+                try
+                {
+                    await SyncSchedulesAsync(plan, updatedPlanDto.Schedules);
+                }
+                catch (InvalidOperationException ex)
+                {
+                    await transaction.RollbackAsync();
+                    return BadRequest(new { message = ex.Message });
+                }
+            }
+
+            await _db.SaveChangesAsync();
+            await transaction.CommitAsync();
+            var result = await BuildResponseDtoAsync(plan);
+            return Ok(new { message = "Audit plan berhasil di update", data = result });
+        }
+        catch (Exception ex)
         {
-            try
-            {
-                await SyncSchedulesAsync(plan, updatedPlanDto.Schedules);
-            }
-            catch (InvalidOperationException ex)
-            {
-                return BadRequest(new { message = ex.Message });
-            }
+            await transaction.RollbackAsync();
+            return StatusCode(500, new { message = "Terjadi kesalahan internal saat mengupdate audit plan.", detail = ex.Message});
         }
 
-        await _db.SaveChangesAsync();
-        var result = await BuildResponseDtoAsync(plan);
-        return Ok(new { message = "Audit plan berhasil di update", data = result });
+
+
     }
 
     [HttpDelete("{id}")]
