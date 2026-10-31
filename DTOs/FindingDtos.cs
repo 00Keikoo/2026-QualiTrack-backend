@@ -12,7 +12,7 @@ public class CreateFindingRequest
     public Guid? ChecklistItemId { get; set; }
     public string ReporterName { get; set; } = string.Empty;
     public Guid? ReporterId { get; set; }
-    public FindingCategory Category { get; set; } = null!;
+    public Guid? CategoryId { get; set; } 
     [Required]
     public string Description { get; set; } = string.Empty;
     public string ClauseRef { get; set; } = string.Empty;

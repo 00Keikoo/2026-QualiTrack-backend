@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using QualiTrack.Constants;
 using QualiTrack.Data;
 using QualiTrack.Models;
 
@@ -6,6 +7,89 @@ public static class DbSeeder
 {
     public static async Task SeedAsync(AppDbContext db)
     {
+        // ============================================================
+        // SEED FindingCategories (WAJIB — untuk FK Findings.CategoryId)
+        // ============================================================
+        if (!await db.FindingCategories.AnyAsync())
+        {
+            db.FindingCategories.AddRange(
+                new FindingCategory
+                {
+                    Id = Guid.NewGuid(),
+                    Name = DefaultCategories.Minor,
+                    Description = "Minor non-conformance",
+                    Severity = 1,
+                    RequiresImmediateAction = false,
+                    IsActive = true,
+                    CreatedAt = DateTime.UtcNow
+                },
+                new FindingCategory
+                {
+                    Id = Guid.NewGuid(),
+                    Name = DefaultCategories.Major,
+                    Description = "Major non-conformance",
+                    Severity = 2,
+                    RequiresImmediateAction = true,
+                    IsActive = true,
+                    CreatedAt = DateTime.UtcNow
+                },
+                new FindingCategory
+                {
+                    Id = Guid.NewGuid(),
+                    Name = DefaultCategories.Observation,
+                    Description = "Observation / OFI",
+                    Severity = 0,
+                    RequiresImmediateAction = false,
+                    IsActive = true,
+                    CreatedAt = DateTime.UtcNow
+                }
+            );
+            await db.SaveChangesAsync();
+        }
+
+        // ============================================================
+        // SEED CapaStatuses (WAJIB — untuk FK CAPAs.StatusId)
+        // ============================================================
+        if (!await db.CapaStatuses.AnyAsync())
+        {
+            db.CapaStatuses.AddRange(
+                new CapaStatus
+                {
+                    Id = Guid.NewGuid(),
+                    Name = DefaultStatuses.Open,
+                    Description = "CAPA baru dibuat",
+                    OrderIndex = 1,
+                    IsTerminal = false,
+                    IsActive = true,
+                    CreatedAt = DateTime.UtcNow
+                },
+                new CapaStatus
+                {
+                    Id = Guid.NewGuid(),
+                    Name = DefaultStatuses.InProgress,
+                    Description = "CAPA sedang dikerjakan",
+                    OrderIndex = 2,
+                    IsTerminal = false,
+                    IsActive = true,
+                    CreatedAt = DateTime.UtcNow
+                },
+                new CapaStatus
+                {
+                    Id = Guid.NewGuid(),
+                    Name = DefaultStatuses.Closed,
+                    Description = "CAPA sudah ditutup",
+                    OrderIndex = 3,
+                    IsTerminal = true,
+                    IsActive = true,
+                    CreatedAt = DateTime.UtcNow
+                }
+            );
+            await db.SaveChangesAsync();
+        }
+
+        // ============================================================
+        // SEED Checklists (KODE LAMA — TIDAK DIUBAH)
+        // ============================================================
         var checklists = new List<Checklist>
         {
             // ── ISO 9001 - Warehouse ──────────────────────────────────────────
@@ -236,8 +320,6 @@ public static class DbSeeder
                 ]
             },
         };
-
-
 
         foreach (var checklist in checklists)
         {

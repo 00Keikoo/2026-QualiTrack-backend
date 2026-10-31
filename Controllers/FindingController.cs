@@ -101,11 +101,25 @@ public class FindingController(AppDbContext db) : ControllerBase
             reporterName = reporter?.FullName ?? string.Empty;
         }
 
-        var minorCategory = await db.FindingCategories
-            .FirstOrDefaultAsync(c => c.Name == DefaultCategories.Minor && c.IsActive);
-
-        if (minorCategory == null)
-            return BadRequest(new { message = $"Category '{DefaultCategories.Minor}' tidak ditemukan" });
+        Guid categoryId;
+        if(req.CategoryId.HasValue && req.CategoryId != Guid.Empty)
+        {
+            var category = await db.FindingCategories
+                .FirstOrDefaultAsync(c => c.Id == req.CategoryId.Value && c.IsActive);
+            if(category == null)
+                return BadRequest(new {message = "Category tidak valid atau tidak aktif"});
+            categoryId = category.Id;
+        }
+        else
+        {
+            // Jika frontend tidak mengirim, otomatis gunakan Minor NC
+            var minorCategory = await db.FindingCategories
+                .FirstOrDefaultAsync(c => c.Name == DefaultCategories.Minor && c.IsActive);
+            if (minorCategory == null)
+                return BadRequest(new { message = $"Category default '{DefaultCategories.Minor}' tidak ditemukan di database" });
+        
+            categoryId = minorCategory.Id;
+        }
 
         var finding = new Finding
         {
@@ -116,7 +130,7 @@ public class FindingController(AppDbContext db) : ControllerBase
             ChecklistItemId = req.ChecklistItemId,
             ReporterName = reporterName,
             ReporterId = req.ReporterId,
-            CategoryId = minorCategory.Id,
+            CategoryId = categoryId,
             Description = req.Description,
             ClauseRef = req.ClauseRef,
             FoundAt = DateTime.UtcNow,
