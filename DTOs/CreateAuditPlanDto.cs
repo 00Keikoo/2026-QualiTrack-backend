@@ -25,6 +25,8 @@ public class CreateAuditPlanDto
 
 public class CreateScheduleDto
 {
+    public Guid? Id { get; set; }
+
     [Required(ErrorMessage = "ClauseRef wajib diisi")]
     public string ClauseRef { get; set; } = string.Empty;
 

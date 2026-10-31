@@ -1,7 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.IdentityModel.Protocols;
 using System.Security.Claims;
 using QualiTrack.Data;
 using QualiTrack.DTOs;
@@ -61,8 +60,8 @@ public class AuditPlanController : ControllerBase
                 CreatedAt = plan.CreatedAt,
                 Description = plan.Description,
                 Priority = plan.Priority,
-                TotalSchedules = plan.Schedules.Count,
-                Schedules = plan.Schedules.Select(s => new ScheduleResponseDto
+                TotalSchedules = schedules.Count,
+                Schedules = schedules.Select(s => new ScheduleResponseDto
                 {
                     Id = s.Id,
                     ClauseRef = s.ClauseRef,
@@ -150,6 +149,9 @@ public class AuditPlanController : ControllerBase
             var schedules = new List<AuditSchedule>();
             foreach (var scheduleDto in planDto.Schedules)
             {
+                if (!scheduleDto.ScheduledDate.HasValue)
+                    return BadRequest(new { message = $"ScheduledDate untuk Clause {scheduleDto.ClauseRef} wajib diisi." });
+
                 var auditor = await _db.Users
                     .FirstOrDefaultAsync(u => u.FullName == scheduleDto.AuditorName);
                 if (auditor is null)
@@ -198,14 +200,9 @@ public class AuditPlanController : ControllerBase
 
         if (updatedPlanDto.Schedules is not null)
         {
-            var scheduleIds = plan.Schedules.Select(s => s.Id).ToList();
-            await DeleteRelatedSessionAsync(scheduleIds);
-            _db.AuditSchedules.RemoveRange(plan.Schedules);
-
             try
             {
-                var newSchedules = await CreateSchedulesFromDtoAsync(updatedPlanDto.Schedules, plan.Id);
-                _db.AuditSchedules.AddRange(newSchedules);
+                await SyncSchedulesAsync(plan, updatedPlanDto.Schedules);
             }
             catch (InvalidOperationException ex)
             {
@@ -262,38 +259,63 @@ public class AuditPlanController : ControllerBase
         return Ok(new { message = "Audit plan berhasil dihapus", id = id });
     }
 
-    private async Task<List<AuditSchedule>> CreateSchedulesFromDtoAsync(List<CreateScheduleDto> scheduleDtos, Guid planId)
+    private async Task SyncSchedulesAsync(AuditPlan plan, List<CreateScheduleDto> dtos)
     {
-        var newSchedules = new List<AuditSchedule>();
+        var keepIds = dtos.Where(d => d.Id.HasValue).Select(d => d.Id!.Value).ToHashSet();
 
-        foreach (var scheduleDto in scheduleDtos)
+        // 1. HAPUS schedule yang tidak ada di request
+        var removed = plan.Schedules.Where(s => !keepIds.Contains(s.Id)).ToList();
+        if (removed.Any())
         {
-            var auditor = await _db.Users
-                .FirstOrDefaultAsync(u => u.FullName == scheduleDto.AuditorName);
+            var removedIds = removed.Select(s => s.Id).ToList();
+            var hasSession = await _db.AuditSessions.AnyAsync(s => removedIds.Contains(s.ScheduleId));
+            if (hasSession)
+                throw new InvalidOperationException("Schedule yang sudah memiliki sesi audit tidak bisa dihapus.");
 
-            if (auditor is null)
-            {
-                throw new InvalidOperationException(
-                    $"Auditor dengan nama {scheduleDto.AuditorName} tidak ditemukan"
-                );
-            }
-
-            newSchedules.Add(new AuditSchedule
-            {
-                Id = Guid.NewGuid(),
-                ClauseRef = scheduleDto.ClauseRef,
-                AuditorId = auditor.Id,
-                AuditorName = auditor.FullName,
-                ScheduledDate = DateTime.SpecifyKind(
-                    scheduleDto.ScheduledDate!.Value,
-                    DateTimeKind.Utc
-                ),
-                Department = scheduleDto.Department,
-                AuditPlanId = planId
-            });
+            _db.AuditSchedules.RemoveRange(removed);
         }
 
-        return newSchedules;
+        // 2. UPDATE / TAMBAH schedule
+        foreach (var dto in dtos)
+        {
+            // Validasi ScheduledDate (AP-02)
+            if (!dto.ScheduledDate.HasValue)
+                throw new InvalidOperationException($"ScheduledDate untuk Clause {dto.ClauseRef} wajib diisi.");
+
+            var auditor = await _db.Users.FirstOrDefaultAsync(u => u.FullName == dto.AuditorName)
+                ?? throw new InvalidOperationException($"Auditor dengan nama {dto.AuditorName} tidak ditemukan");
+
+            var date = DateTime.SpecifyKind(dto.ScheduledDate.Value, DateTimeKind.Utc);
+            var existing = dto.Id.HasValue ? plan.Schedules.FirstOrDefault(s => s.Id == dto.Id.Value) : null;
+
+            if (existing is not null)
+            {
+                var isCompleted = await _db.AuditSessions
+                    .AnyAsync(s => s.ScheduleId == existing.Id && s.Status == AuditSessionStatus.Completed);
+
+                if (isCompleted)
+                    throw new InvalidOperationException($"Jadwal (Clause: {existing.ClauseRef}) tidak dapat diubah karena audit sudah selesai.");
+
+                existing.ClauseRef = dto.ClauseRef;
+                existing.AuditorId = auditor.Id;
+                existing.AuditorName = auditor.FullName;
+                existing.ScheduledDate = date;
+                existing.Department = dto.Department;
+            }
+            else
+            {
+                _db.AuditSchedules.Add(new AuditSchedule
+                {
+                    Id = Guid.NewGuid(),
+                    ClauseRef = dto.ClauseRef,
+                    AuditorId = auditor.Id,
+                    AuditorName = auditor.FullName,
+                    ScheduledDate = date,
+                    Department = dto.Department,
+                    AuditPlanId = plan.Id
+                });
+            }
+        }
     }
 
     private async Task<AuditPlanResponseDto> BuildResponseDtoAsync(AuditPlan plan)
