@@ -8,6 +8,7 @@ using QualiTrack.Filters;
 using QualiTrack.Services;
 using System.Security.Claims;
 using QualiTrack.Constants;
+using Microsoft.Extensions.Caching.Memory;
 
 namespace QualiTrack.Controllers;
 
@@ -15,7 +16,7 @@ namespace QualiTrack.Controllers;
 [Route("api/admin")]
 [Authorize(Roles = "Admin")]
 [ValidateModelAttribute]
-public class AdminController(AppDbContext db, IAdminActivityService activityService) : ControllerBase
+public class AdminController(AppDbContext db, IAdminActivityService activityService, IMemoryCache cache) : ControllerBase
 {
     private static readonly string[] ValidRoles = UserRoles.AllRoles;
 
@@ -176,6 +177,9 @@ public class AdminController(AppDbContext db, IAdminActivityService activityServ
             user.Status = req.Status;
             await db.SaveChangesAsync();
             await transaction.CommitAsync();
+
+            // Invalidate cache supaya user langsung terblokir
+            cache.Remove(ValidateUserFilter.CacheKey(id));
 
             return Ok(new { message = $"Status user berhasil diubah menjadi {req.Status}" });
         }

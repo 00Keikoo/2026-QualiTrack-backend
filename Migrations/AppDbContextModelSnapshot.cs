@@ -807,10 +807,16 @@ namespace QualiTrack.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
+                    b.Property<int>("OtpAttempts")
+                        .HasColumnType("integer");
+
                     b.Property<string>("OtpCode")
                         .HasColumnType("text");
 
                     b.Property<DateTime?>("OtpExpiry")
+                        .HasColumnType("timestamp without time zone");
+
+                    b.Property<DateTime?>("OtpLockoutEnd")
                         .HasColumnType("timestamp without time zone");
 
                     b.Property<string>("PasswordHash")

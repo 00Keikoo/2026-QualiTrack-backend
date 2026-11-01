@@ -1,38 +1,57 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Filters;
 using Microsoft.EntityFrameworkCore;
-using QualiTrack.Data;
+using Microsoft.Extensions.Caching.Memory;
 using QualiTrack.Constants;
+using QualiTrack.Data;
 using System.Security.Claims;
 
 namespace QualiTrack.Filters;
 
-public class ValidateUserFilter : IAsyncActionFilter
+public class ValidateUserFilter(AppDbContext db, IMemoryCache cache) : IAsyncActionFilter
 {
-    private readonly AppDbContext _db;
+    private static readonly TimeSpan CacheDuration = TimeSpan.FromMinutes(5);
 
-    public ValidateUserFilter(AppDbContext db)
-    {
-        _db = db;
-    }
+    public static string CacheKey(Guid userId) => $"user_status_{userId}";
 
     public async Task OnActionExecutionAsync(ActionExecutingContext context, ActionExecutionDelegate next)
     {
-        var userIdClaim = context.HttpContext.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-
-        if (userIdClaim != null && Guid.TryParse(userIdClaim, out var userId))
+        if (IsAnonymousAllowed(context) || !TryGetUserId(context.HttpContext.User, out var userId))
         {
-            var userExists = await _db.Users.AnyAsync(u => u.Id == userId && u.Status == UserStatus.Active && u.EmailVerified == true);
-            if (!userExists)
+            await next();
+            return;
+        }
+
+        if (!await IsActiveUserAsync(userId))
+        {
+            cache.Remove(CacheKey(userId));
+            context.Result = new UnauthorizedObjectResult(new
             {
-                context.Result = new UnauthorizedObjectResult(new
-                {
-                    message = "Akun tidak ditemukan atau telah dihapus"
-                });
-                return;
-            }
+                message = "Akun tidak aktif atau tidak ditemukan"
+            });
+            return;
         }
 
         await next();
     }
+
+    private static bool IsAnonymousAllowed(ActionExecutingContext context) =>
+        context.ActionDescriptor.EndpointMetadata.Any(m => m is AllowAnonymousAttribute);
+
+    private static bool TryGetUserId(ClaimsPrincipal principal, out Guid userId)
+    {
+        var claim = principal.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        return Guid.TryParse(claim, out userId);
+    }
+
+    private async Task<bool> IsActiveUserAsync(Guid userId) =>
+        await cache.GetOrCreateAsync(CacheKey(userId), async entry =>
+        {
+            entry.AbsoluteExpirationRelativeToNow = CacheDuration;
+            return await db.Users.AnyAsync(u =>
+                u.Id == userId &&
+                u.Status == UserStatus.Active &&
+                u.EmailVerified);
+        });
 }

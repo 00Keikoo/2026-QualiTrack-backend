@@ -27,12 +27,19 @@ public class AuthController(AppDbContext db, IConfiguration config, IEmailServic
     private const int OtpLength = 4;
     private const int OtpMin = 1000;
     private const int OtpMax = 9999;
+    private const int MaxOtpAttempts = 5;
+    private const int OtpLockoutMinutes = 15;
+    private const string InvalidOtpMessage = "Kode OTP tidak valid atau sudah kadaluarsa.";
+    private const string OtpLockedMessage = "Terlalu banyak percobaan. Silahkan coba lagi nanti.";
+    private static string HashToken(string token) =>  
+        Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(token)));
 
     private async Task GenerateAndSendOtpAsync(User user, string email)
     {
         var otp = GenerateSecureOtp();
         user.OtpCode = BCrypt.Net.BCrypt.HashPassword(otp);
         user.OtpExpiry = DateTime.UtcNow.AddMinutes(OtpExpiryMinutes);
+        user.OtpAttempts = 0;
         await db.SaveChangesAsync();
         await emailService.SendOtpAsync(email, otp);
     }
@@ -42,8 +49,56 @@ public class AuthController(AppDbContext db, IConfiguration config, IEmailServic
         var otp = GenerateSecureOtp();
         user.OtpCode = BCrypt.Net.BCrypt.HashPassword(otp);
         user.OtpExpiry = DateTime.UtcNow.AddMinutes(OtpExpiryMinutes);
+        user.OtpAttempts = 0;
         await db.SaveChangesAsync();
         await emailService.SendRegistrationOtpAsync(email, otp);
+    }
+
+    private async Task<IActionResult?> ValidateOtpAsync(User user, string otp)
+    {
+        // Lockout
+        if (user.OtpLockoutEnd.HasValue && DateTime.UtcNow < user.OtpLockoutEnd.Value)
+        {
+            return BadRequest(new { message = OtpLockedMessage });
+        }
+
+        if (user.OtpCode is null || user.OtpExpiry is null)
+        {
+            return BadRequest(new { message = InvalidOtpMessage });
+        }
+
+        //Kadaluarsa
+        if (DateTime.UtcNow > user.OtpExpiry)
+        {
+            ClearOtp(user);
+            await db.SaveChangesAsync();
+            return BadRequest(new { message = InvalidOtpMessage });
+        }
+
+        if (!BCrypt.Net.BCrypt.Verify(otp, user.OtpCode))
+        {
+            user.OtpAttempts++;
+
+            if (user.OtpAttempts >= MaxOtpAttempts)
+            {
+                ClearOtp(user);
+                user.OtpLockoutEnd = DateTime.UtcNow.AddMinutes(OtpLockoutMinutes);
+                await db.SaveChangesAsync();
+                return BadRequest(new { message = OtpLockedMessage });
+            }
+
+            await db.SaveChangesAsync();
+            return BadRequest(new { message = InvalidOtpMessage });
+        }
+
+        return null; //OTP Valid
+    }
+
+    private static void ClearOtp(User user)
+    {
+        user.OtpCode = null;
+        user.OtpExpiry = null;
+        user.OtpAttempts = 0;
     }
 
     [HttpPost("register")]
@@ -53,7 +108,7 @@ public class AuthController(AppDbContext db, IConfiguration config, IEmailServic
             return BadRequest(new { message = "Role tidak valid. Pilih: QualityManager, AuditorInternal, Auditee, Admin" });
 
         if (req.Role == "Admin")
-            return BadRequest(new { message = "Role admin tidak dapat didaftarkan secara mandiri. Hubungi adminstrator sistem. " });
+            return BadRequest(new { message = "Role admin tidak dapat didaftarkan secara mandiri. Hubungi administrator sistem. " });
 
         req = req with { Role = UserRoles.NormalizeRole(req.Role) };
 
@@ -111,41 +166,29 @@ public class AuthController(AppDbContext db, IConfiguration config, IEmailServic
     public async Task<IActionResult> VerifyEmail([FromBody] VerifyEmailRequest req)
     {
         var user = await db.Users.FirstOrDefaultAsync(u => u.Email == req.Email);
-        if (user is null)
-            return NotFound(new { message = "Email tidak ditemukan" });
+        if (user is null || user.EmailVerified)
+            return BadRequest(new { message = InvalidOtpMessage });
 
-        if (user.EmailVerified)
-            return BadRequest(new { message = "Email sudah diverifikasi" });
-
-        if (user.OtpCode is null || user.OtpExpiry is null)
-            return BadRequest(new { message = "OTP belum di-request" });
-
-        if (DateTime.UtcNow > user.OtpExpiry)
-            return BadRequest(new { message = "OTP sudah kadaluarsa, minta OTP baru" });
-
-        if (!BCrypt.Net.BCrypt.Verify(req.Otp, user.OtpCode))
-            return BadRequest(new { message = "OTP tidak valid" });
+        var error = await ValidateOtpAsync(user, req.Otp);
+        if (error is not null) return error;
 
         user.EmailVerified = true;
         user.Status = UserStatus.Active;
-        user.OtpCode = null;
-        user.OtpExpiry = null;
+        ClearOtp(user);
+        user.OtpLockoutEnd = null; 
         await db.SaveChangesAsync();
 
         return Ok(new { message = "Email berhasil diverifikasi! Silakan login." });
     }
 
+    [EnableRateLimiting("otp")]
     [HttpPost("resend-otp")]
     public async Task<IActionResult> ResendOtp([FromBody] ResendOtpRequest req)
     {
         var user = await db.Users.FirstOrDefaultAsync(u => u.Email == req.Email);
-        if (user is null)
-            return NotFound(new { message = "Email tidak ditemukan" });
 
-        if (user.EmailVerified)
-            return BadRequest(new { message = "Email sudah diverifikasi" });
-
-        await GenerateAndSendOtpAsync(user, user.Email);
+        if (user is not null && !user.EmailVerified)
+            await GenerateAndSendOtpAsync(user, user.Email);
 
         return Ok(new { message = "Kode OTP baru telah dikirim ke email kamu" });
 
@@ -163,7 +206,7 @@ public class AuthController(AppDbContext db, IConfiguration config, IEmailServic
             return Unauthorized(new { message = "Email belum diverifikasi. Cek inbox email kamu." });
 
         if (user.Status != UserStatus.Active)
-            return Unauthorized(new { message = "Akun tidak aktif. Hubungi adminstrator"});
+            return Unauthorized(new { message = "Akun tidak aktif. Hubungi administrator"});
 
         var token = GenerateJwt(user);
         return Ok(new AuthResponse(token, UserRoles.GetClaimRole(user.Role), user.FullName));
@@ -206,70 +249,71 @@ public class AuthController(AppDbContext db, IConfiguration config, IEmailServic
     public async Task<IActionResult> RequestOtp([FromBody] RequestOtpRequest req)
     {
         var user = await db.Users.FirstOrDefaultAsync(u => u.Email == req.Email);
-        if (user is null)
-            return NotFound(new { message = "Email tidak ditemukan" });
 
-        await GenerateAndSendOtpAsync(user, user.Email);
+        if (user is not null)
+            await GenerateAndSendOtpAsync(user, user.Email);
 
         return Ok(new { message = "Kode OTP telah dikirim ke email kamu" });
     }
 
+    [EnableRateLimiting("otp")]
     [HttpPost("forgot-password/verify-otp")]
     public async Task<IActionResult> VerifyOtp([FromBody] VerifyOtpRequest req)
     {
         var user = await db.Users.FirstOrDefaultAsync(u => u.Email == req.Email);
         if (user is null)
-            return NotFound(new { message = "Email tidak ditemukan" });
+            return BadRequest(new { message = InvalidOtpMessage });
 
-        if (user.OtpCode is null || user.OtpExpiry is null)
-            return BadRequest(new { message = "OTP belum di-request" });
+        var error = await ValidateOtpAsync(user, req.Otp);
+        if (error is not null) return error;
 
-        if (DateTime.UtcNow > user.OtpExpiry)
-            return BadRequest(new { message = "OTP sudah kadaluarsa, minta OTP baru" });
-
-        if (!BCrypt.Net.BCrypt.Verify(req.Otp, user.OtpCode))
-            return BadRequest(new { message = "OTP tidak valid" });
-
-        var resetToken = Guid.NewGuid().ToString();
-        user.ResetToken = resetToken;
+        var resetToken = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
+        user.ResetToken = HashToken(resetToken);
         user.OtpCode = null;
         user.OtpExpiry = DateTime.UtcNow.AddMinutes(ResetTokenExpiryMinutes);
+        user.OtpAttempts = 0;
+        user.OtpLockoutEnd = null;
         await db.SaveChangesAsync();
 
-        return Ok(new { message = "OTP valid", resetToken = resetToken });
+        return Ok(new { message = "OTP valid", resetToken });
     }
 
     [HttpPost("forgot-password/reset")]
     public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordRequest req)
     {
-        var user = await db.Users.FirstOrDefaultAsync(u => u.Email == req.Email);
-        if (user is null)
-            return NotFound(new { message = "Email tidak ditemukan" });
+        const string invalidResetMessage = "Reset token tidak valid atau sudah kadaluarsa.";
 
-        if (user.ResetToken is null || user.OtpExpiry is null)
-            return BadRequest(new { message = "Reset token tidak valid" });
+        var user = await db.Users.FirstOrDefaultAsync(u => u.Email == req.Email);
+        if (user is null || user.ResetToken is null || user.OtpExpiry is null)
+            return BadRequest(new { message = invalidResetMessage });
 
         if (DateTime.UtcNow > user.OtpExpiry)
-            return BadRequest(new { message = "Reset token sudah kadaluarsa" });
+            return BadRequest(new { message = invalidResetMessage });
 
-        if (user.ResetToken != req.ResetToken)
-            return BadRequest(new { message = "Reset token tidak valid" });
+        // Bandingkan token dengat waktu konstan
+        var tokenMatches = CryptographicOperations.FixedTimeEquals(
+            Encoding.UTF8.GetBytes(user.ResetToken),
+            Encoding.UTF8.GetBytes(HashToken(req.ResetToken ?? "")));
+
+        if (!tokenMatches)
+            return BadRequest(new { message = invalidResetMessage });
 
         if (req.NewPassword.Length < 6)
-            return BadRequest(new { message = "Password minimal 6 karakter" });
+            return BadRequest(new { message = "Password minimal 6 karakterr" });
 
-        if (string.Equals(req.NewPassword, req.ConfirmPassword) == false)
-            return BadRequest(new { message = "Password dan konfirmasi password tidak sama" });
+        if (req.NewPassword != req.ConfirmPassword)
+            return BadRequest(new { message = "Password dan konfirmasi password tidak sama." });
 
         user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(req.NewPassword);
         user.ResetToken = null;
-        user.OtpCode = null;
-        user.OtpExpiry = null;
+        ClearOtp(user);
+        user.OtpLockoutEnd = null;
         await db.SaveChangesAsync();
 
         return Ok(new { message = "Password berhasil direset, silakan login" });
     }
 
+    [EnableRateLimiting("otp")]
     [HttpPost("request-email-change-otp")]
     [Authorize]
     public async Task<IActionResult> RequestEmailChangeOtp([FromBody] RequestEmailChangeOtpRequest req)
@@ -299,19 +343,23 @@ public class AuthController(AppDbContext db, IConfiguration config, IEmailServic
         if (string.IsNullOrEmpty(user.PendingEmail))
             return BadRequest(new { message = "Tidak ada permintaan ganti email yang aktif" });
 
-        if (user.OtpCode is null || user.OtpExpiry is null)
-            return BadRequest(new { message = "OTP belum di-request" });
+        var error = await ValidateOtpAsync(user, req.Otp);
+        if (error is not null) return error;
 
-        if (DateTime.UtcNow > user.OtpExpiry)
-            return BadRequest(new { message = "OTP sudah kadaluarsa, minta OTP baru" });
-
-        if (!BCrypt.Net.BCrypt.Verify(req.Otp, user.OtpCode))
-            return BadRequest(new { message = "OTP tidak valid" });
+        // Cek ulang: email bisa saja sudah dipakai orang lain sejak OTP diminta
+        var emailTaken = await db.Users.AnyAsync(u => u.Email == user.PendingEmail && u.Id != userId);
+        if (emailTaken)
+        {
+            user.PendingEmail = null;
+            ClearOtp(user);
+            await db.SaveChangesAsync();
+            return BadRequest(new { message = "Email sudah digunakan oleh akun lain" });
+        }
 
         user.Email = user.PendingEmail;
         user.PendingEmail = null;
-        user.OtpCode = null;
-        user.OtpExpiry = null;
+        ClearOtp(user);
+        user.OtpLockoutEnd = null;
         await db.SaveChangesAsync();
 
         return Ok(new { message = "Email berhasil diperbarui", newEmail = user.Email });

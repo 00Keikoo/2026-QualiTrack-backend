@@ -31,6 +31,10 @@ public class User
     public DateTime? OtpExpiry { get; set; }
     [JsonIgnore]
     public string? ResetToken { get; set; }
+    [JsonIgnore]
+    public int OtpAttempts { get; set; } = 0;
+    [JsonIgnore]
+    public DateTime? OtpLockoutEnd { get; set; }
     public string? ProfilePhotoUrl { get; set; }    
     [JsonIgnore]
     public string? PendingEmail { get; set; }

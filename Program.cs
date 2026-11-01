@@ -57,6 +57,7 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     });
 
 builder.Services.AddAuthorization();
+builder.Services.AddMemoryCache();
 
 builder.Services.AddCors(options =>
 {
@@ -92,7 +93,6 @@ else
 
 builder.WebHost.ConfigureKestrel(o => o.Limits.MaxRequestBodySize = 10 * 1024 * 1024);
 
-builder.Services.AddScoped<ValidateUserFilter>();
 builder.Services.AddScoped<PdfReportService>();
 builder.Services.AddScoped<FileValidationService>();
 
@@ -102,6 +102,7 @@ builder.Services.AddControllers(options =>
 {
     options.Filters.Add<ValidateUserFilter>();
 })
+
 .AddJsonOptions(options =>
 {
     options.JsonSerializerOptions.Converters.Add(
