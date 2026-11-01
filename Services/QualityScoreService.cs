@@ -29,7 +29,11 @@ public class QualityScoreService(AppDbContext db) : IQualityScoreService
                     {
                         var conformCount = session.Responses.Count(r => r.Answer == ResponseAnswer.Conform);
                         var itemCount = session.Responses.Count;
+
+                        if (itemCount == 0) continue;
+
                         var isOverdue = session.CompletedAt.HasValue && session.CompletedAt.Value > session.Schedule.ScheduledDate;
+                        // Penalti -1 untuk audit yang selesai terlambat (business rule)
                         var adjustedConform = isOverdue ? Math.Max(0, conformCount - 1) : conformCount;
 
                         totalItems += itemCount;
@@ -41,7 +45,9 @@ public class QualityScoreService(AppDbContext db) : IQualityScoreService
                         Period = g.Key,
                         PeriodLabel = new DateTime(year, g.Key, 1).ToString("MMM yyyy"),
                         TotalSessions = g.Count(),
+                        // ComplianceScore : skor setelah penalti keterlambatan
                         ComplianceScore = totalItems == 0 ? 0 : Math.Round((double)totalAdjustedConform / totalItems * 100, 1),
+                        // QualityScore : skor mentah tanpa penalti
                         QualityScore = totalConform == 0 ? 0 : Math.Round((double)totalConform / totalItems * 100, 1)
                     };
                 })
@@ -66,14 +72,12 @@ public class QualityScoreService(AppDbContext db) : IQualityScoreService
             .Include(s => s.Schedule)
             .Include(s => s.Responses)
             .Where(s => s.Status == AuditSessionStatus.Completed
-                && s.CompletedAt.HasValue
-                && s.CompletedAt.Value < startOfCurrentMonth)
+                && s.CompletedAt.HasValue)
             .AsQueryable();
 
         
         // Exclude bulan berjalan HANYA untuk timeframe yang membandingkan periode closed
-        if (timeframe.ToLower() != "all")
-            query = query.Where(s => s.CompletedAt!.Value < startOfCurrentMonth);
+        query = query.Where(s => s.CompletedAt!.Value < startOfCurrentMonth);
             
         if (cutoff.HasValue)
             query = query.Where(s => s.CompletedAt!.Value >= cutoff.Value);
@@ -136,8 +140,8 @@ public class QualityScoreService(AppDbContext db) : IQualityScoreService
                 Year = g.Key.Year,
                 Month = g.Key.Month,
                 PeriodLabel = new DateTime(g.Key.Year, g.Key.Month, 1).ToString("MMM yyyy"),
-                OverallScore = Math.Round(g.Average(p => p.ComplianceScore), 0),
-                DepartmentCount = g.Count()
+                OverallScore = Math.Round(g.Average(p => p.ComplianceScore), 1),
+                DepartmentWithDataCount = g.Count()
             })
             .OrderBy(x => x.Year).ThenBy(x => x.Month)
             .ToList();

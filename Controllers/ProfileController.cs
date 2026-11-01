@@ -38,14 +38,14 @@ public class ProfileController : ControllerBase
         if (user is null)
             return NotFound(new { message = "User tidak ditemukan" });
 
-        return Ok(new
+        return Ok(new ProfileResponseDto
         {
-            user.Id,
-            user.FullName,
-            user.Email,
-            user.Role,
-            user.Status,
-            user.ProfilePhotoUrl
+            Id = user.Id,
+            FullName = user.FullName,
+            Email = user.Email,
+            Role = user.Role,
+            Status = user.Status,
+            ProfilePhotoUrl = user.ProfilePhotoUrl
         });
     }
 
@@ -81,6 +81,10 @@ public class ProfileController : ControllerBase
             return Unauthorized();
 
         var kpi = await _kpiService.GetUserKpiAsync(userId);
+        if (kpi is null)
+        {
+            return BadRequest(new { message = "User tidak ditemukan atau role tidak valid untuk KPI" });
+        }
         return Ok(kpi);
     }
 

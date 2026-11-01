@@ -7,16 +7,16 @@ namespace QualiTrack.Services;
 
 public class KpiService(AppDbContext db) : IKpiService
 {
-    public async Task<KpiDto> GetUserKpiAsync(Guid userId)
+    public async Task<KpiDto?> GetUserKpiAsync(Guid userId)
     {
         var user = await db.Users.FindAsync(userId);
-        if (user is null) return new KpiDto();
+        if (user is null) return null;
 
         return user.Role switch
         {
             "AuditorInternal" => await GetAuditorKpiAsync(userId),
             "Auditee" => await GetAuditeeKpiAsync(userId),
-            _ => new KpiDto()
+            _ => null
         };
     }
 
@@ -56,7 +56,7 @@ public class KpiService(AppDbContext db) : IKpiService
             TotalStalled = stalled,
             OnTimeRate = closedCapas.Count == 0
                 ? 0
-                : (double)closedOnTime / closedCapas.Count,
+                : Math.Round((double)closedOnTime / closedCapas.Count * 100, 1),
             TotalFindingsReported = totalFindingReported,
             ComplianceScore = userCapas.Count == 0
                 ? 0
@@ -115,7 +115,7 @@ public class KpiService(AppDbContext db) : IKpiService
             TotalStalled = stalled,
             OnTimeRate = completed.Count == 0
                 ? 0
-                : (double)completedOnTime / completed.Count,
+                : Math.Round((double)completedOnTime / completed.Count * 100, 1),
             ComplianceScore = audits.Count == 0
                 ? 0
                 : Math.Round((double)completed.Count / audits.Count * 100, 1),
