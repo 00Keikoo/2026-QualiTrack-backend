@@ -238,6 +238,18 @@ public class AuthController(AppDbContext db, IConfiguration config, IEmailServic
         var user = await db.Users.FindAsync(userId);
         if (user is null) return NotFound(new { message = "User tidak ditemukan" });
 
+        // Sesuai kesepakatan tim, password lama tidak diminta pada flow ini.
+        // Konfirmasi password tetap divalidasi di server agar tidak hanya bergantung pada UI.
+        if (req.NewPassword != req.ConfirmPassword)
+            return BadRequest(new { message = "Password baru dan konfirmasi password tidak sama" });
+
+        var passwordError = ValidatePasswordStrength(req.NewPassword);
+        if (passwordError is not null)
+            return BadRequest(new { message = passwordError });
+
+        if (BCrypt.Net.BCrypt.Verify(req.NewPassword, user.PasswordHash))
+            return BadRequest(new { message = "Password baru tidak boleh sama dengan password lama" });
+
         user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(req.NewPassword);
         await db.SaveChangesAsync();
 
@@ -396,5 +408,31 @@ public class AuthController(AppDbContext db, IConfiguration config, IEmailServic
         rng.GetBytes(bytes);
         var value = BitConverter.ToUInt32(bytes, 0);
         return ((value % (OtpMax - OtpMin + 1)) + OtpMin).ToString();
+    }
+
+    /// <summary>
+    /// Validasi kekuatan password. Aturannya sengaja dibuat identik dengan checklist
+    /// di frontend (change_password_modal.tsx) supaya tidak ada jalur yang lebih longgar:
+    /// minimal 8 karakter, kombinasi huruf besar & kecil, angka, dan karakter spesial.
+    /// Mengembalikan null jika valid, atau pesan error pertama yang dilanggar.
+    /// </summary>
+    private static string? ValidatePasswordStrength(string password)
+    {
+        if (string.IsNullOrWhiteSpace(password))
+            return "Password baru wajib diisi";
+
+        if (password.Length < 8)
+            return "Password minimal 8 karakter";
+
+        if (!password.Any(char.IsLower) || !password.Any(char.IsUpper))
+            return "Password harus mengandung huruf besar dan huruf kecil";
+
+        if (!password.Any(char.IsDigit))
+            return "Password harus mengandung angka";
+
+        if (password.All(char.IsLetterOrDigit))
+            return "Password harus mengandung karakter spesial";
+
+        return null;
     }
 }
