@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using QualiTrack.Data;
+using QualiTrack.DTOs;
 using QualiTrack.Models;
 using System.Security.Claims;
 
@@ -28,45 +29,44 @@ public class AdminDashboardController(AppDbContext db) : ControllerBase
         // All user recent activities — dari semua user
         var capaActions = await db.CAPAActions
             .Include(a => a.DoneBy)
-            .Select(a => new
+            .Select(a => new RecentActivityDto
             {
-                activityType = "CapaAction",
-                description = a.Description,
-                userName = a.DoneBy != null ? a.DoneBy.FullName : "Unknown",
-                timestamp = a.DoneAt
+                ActivityType = "CapaAction",
+                Description = a.Description + " oleh " + (a.DoneBy != null ? a.DoneBy.FullName : "Unknown"),
+                Timestamp = a.DoneAt,
+                RelatedId = a.CapaId
             })
             .ToListAsync();
 
         var verifications = await db.CloseOutVerifications
             .Include(v => v.VerifiedBy)
-            .Select(v => new
+            .Select(v => new RecentActivityDto
             {
-                activityType = "CapaVerified",
-                description = v.IsEffective
+                ActivityType = "CapaVerified",
+                Description = v.IsEffective
                     ? "Memverifikasi CAPA sebagai efektif"
                     : "Memverifikasi CAPA sebagai tidak efektif",
-                userName = v.VerifiedBy != null ? v.VerifiedBy.FullName : "Unknown",
-                timestamp = v.VerifiedAt
+                Timestamp = v.VerifiedAt,
+                RelatedId = v.CapaId
             })
             .ToListAsync();
         
         var reportedFindings = await db.Findings
             .Include(f => f.Reporter)
             .Where(f => f.ReporterId != null)
-            .Select(f => new
+            .Select(f => new RecentActivityDto
             {
-                activityType = "FindingReported",
-                description = $"Melaporkan finding: {f.Title}",
-                userName = f.Reporter != null ? f.Reporter.FullName : "Unknown",
-                timestamp = f.FoundAt
+                ActivityType = "FindingReported",
+                Description = $"Melaporkan finding: {f.Title} oleh " + (f.Reporter != null ? f.Reporter.FullName : "Unknown"),
+                Timestamp = f.FoundAt,
+                RelatedId = f.Id
             })
             .ToListAsync();
 
         var recentActivities = capaActions
-            .Cast<dynamic>()
-            .Concat(verifications.Cast<dynamic>())
-            .Concat(reportedFindings.Cast<dynamic>())
-            .OrderByDescending(a => (DateTime)a.timestamp)
+            .Concat(verifications)
+            .Concat(reportedFindings)
+            .OrderByDescending(a => a.Timestamp)
             .Take(10)
             .ToList();
 

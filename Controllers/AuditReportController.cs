@@ -26,8 +26,20 @@ public class AuditReportController(
         [FromQuery] string? department,
         [FromQuery] int? year)
     {
-        var sessions = await db.AuditSessions
-            .Where(s => s.Status == AuditSessionStatus.Completed)
+        var query = db.AuditSessions
+            .Where(s => s.Status == AuditSessionStatus.Completed);
+
+        // Filter di IQueryable
+        if (!string.IsNullOrEmpty(standard))
+            query = query.Where(s => s.Schedule.AuditPlan.Standard.ToLower() == standard.ToLower());
+
+        if (!string.IsNullOrEmpty(department))
+            query = query.Where(s => s.Schedule.Department.ToLower() == department.ToLower());
+
+        if (year.HasValue)
+            query = query.Where(s => s.Schedule.AuditPlan.Year == year.Value);
+
+        var sessions = await query
             .Include(s => s.Schedule)
                 .ThenInclude(sch => sch.AuditPlan)
             .Include(s => s.Schedule)
@@ -37,7 +49,7 @@ public class AuditReportController(
                 .ThenInclude(f => f.Category!)
             .Include(s => s.Findings)
                 .ThenInclude(f => f.Capa)
-                    .ThenInclude(c => c!.Status!)
+                .ThenInclude(c => c!.Status!)
             .Include(s => s.Findings)
                 .ThenInclude(f => f.Evidences)
             .Include(s => s.Responses)
@@ -46,16 +58,9 @@ public class AuditReportController(
                 .ThenInclude(r => r.ChecklistItem)
             .ToListAsync();
 
-        if (!string.IsNullOrEmpty(standard))
-            sessions = sessions.Where(s => s.Schedule.AuditPlan.Standard == standard).ToList();
-        if (!string.IsNullOrEmpty(department))
-            sessions = sessions.Where(s => s.Schedule.Department == department).ToList();
-        if (year.HasValue)
-            sessions = sessions.Where(s => s.Schedule.AuditPlan.Year == year).ToList();
-
         var result = new List<AuditReportListItemDto>();
 
-        var parallelOptions = new ParallelOptions { MaxDegreeOfParallelism = 4};
+        var parallelOptions = new ParallelOptions { MaxDegreeOfParallelism = 4 };
         var metadataResults = new ConcurrentDictionary<Guid, PdfReportMetadata>();
 
         await Parallel.ForEachAsync(sessions, parallelOptions, async (s, ct) =>

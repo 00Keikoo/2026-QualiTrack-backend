@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using QualiTrack.Constants;
 using QualiTrack.Data;
 using QualiTrack.Models;
+using QualiTrack.Helpers;
 
 namespace QualiTrack.Controllers;
 
@@ -18,11 +19,12 @@ public class DashboardController(AppDbContext db) : ControllerBase
     [Authorize(Roles = "Admin,QualityManager,AuditorInternal,Auditee")]
     public async Task<IActionResult> GetSummary([FromQuery] int? year)
     {
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var today = DateHelper.TodayWib();
 
         // Filter audit session berdasarkan tahun (misal dari createdAt / schedule)
         var activeAudit = await db.AuditSessions
-            .CountAsync(s => s.Status == AuditSessionStatus.InProgress);
+            .CountAsync(s => s.Status == AuditSessionStatus.InProgress
+                && (!year.HasValue || s.Schedule.AuditPlan.Year == year.Value));
 
         var totalCapa = await db.CAPAs
             .CountAsync();
@@ -97,13 +99,15 @@ public class DashboardController(AppDbContext db) : ControllerBase
                     })
                     .OrderBy(x => x.month)
                     .ToList();
+                
                 return new
                 {
                     department = g.Key,
                     score,
                     totalAudit = g.Count(),
                     totalResponses,
-                    conformResponses
+                    conformResponses,
+                    monthlyBreakdown
                 };
             })
             .OrderByDescending(x => x.score)
@@ -177,19 +181,21 @@ public class DashboardController(AppDbContext db) : ControllerBase
         var targetYear = year ?? DateTime.UtcNow.Year;
 
         // Audit schedules bulan ini
-        var schedules = await db.AuditSchedules
+        var schedulesQuery = db.AuditSchedules
+            .Where(s => s.ScheduledDate.Month == targetMonth
+                && s.ScheduledDate.Year == targetYear);
+
+        var schedules = await schedulesQuery
             .Include(s => s.AuditPlan)
             .Include(s => s.Auditor)
-            .Where(s => s.ScheduledDate.Month == targetMonth
-                     && s.ScheduledDate.Year == targetYear)
             .ToListAsync();
 
-        var scheduleIds = schedules.Select(s => s.Id).ToList();
+        var scheduleIds = await schedulesQuery.Select(s => s.Id).ToListAsync();
 
-        // Sessions bulan ini
+        // Sessions bulan ini - filter langsung di query
         var sessions = await db.AuditSessions
-            .Include(s => s.Responses)
             .Where(s => scheduleIds.Contains(s.ScheduleId))
+            .Include(s => s.Responses)
             .ToListAsync();
 
         // Findings bulan ini
@@ -197,13 +203,14 @@ public class DashboardController(AppDbContext db) : ControllerBase
         var findings = await db.Findings
             .Include(f => f.Category)
             .Where(f => f.SessionId.HasValue && sessionIds.Contains(f.SessionId.Value))
+            .Include(f => f.Category)
             .ToListAsync();
 
         // CAPA bulan ini
         var findingIds = findings.Select(f => f.Id).ToList();
         var capas = await db.CAPAs
-            .Include(c => c.Status)
             .Where(c => findingIds.Contains(c.FindingId))
+            .Include(c => c.Status)
             .ToListAsync();
 
         // Hitung compliance score
@@ -214,7 +221,7 @@ public class DashboardController(AppDbContext db) : ControllerBase
             ? Math.Round((double)conformResponses / totalResponses * 100, 1)
             : 0;
 
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var today = DateHelper.TodayWib();
 
         return Ok(new
         {
@@ -226,7 +233,7 @@ public class DashboardController(AppDbContext db) : ControllerBase
                 totalSchedules = schedules.Count,
                 completedAudit = sessions.Count(s => s.Status == AuditSessionStatus.Completed),
                 inProgressAudit = sessions.Count(s => s.Status == AuditSessionStatus.InProgress),
-                notStartedAudit = schedules.Count - sessions.Count,
+                notStartedAudit = Math.Max(0, schedules.Count - sessions.Count),
                 complianceScore,
                 totalFindings = findings.Count,
                 totalCapa = capas.Count,
