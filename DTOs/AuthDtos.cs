@@ -52,9 +52,16 @@ public record ResetPasswordRequest(
     string ConfirmPassword
 );
 
+// Catatan: sengaja tanpa [MinLength] deklaratif. Seluruh aturan kekuatan password
+// divalidasi terpusat di AuthController.ValidatePasswordStrength supaya pesan error
+// konsisten dan sama persis dengan checklist kekuatan password di frontend.
+// Sesuai kesepakatan tim, password lama TIDAK diminta pada flow ini.
 public record ChangePasswordRequest(
-    [Required][MinLength(6, ErrorMessage = "Password minimal 6 karakter")]
-    string NewPassword
+    [Required(ErrorMessage = "Password baru wajib diisi")]
+    string NewPassword,
+
+    [Required(ErrorMessage = "Konfirmasi password wajib diisi")]
+    string ConfirmPassword
 );
 
 public record UpdateProfileRequest(

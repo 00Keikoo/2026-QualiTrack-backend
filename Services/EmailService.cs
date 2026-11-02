@@ -22,7 +22,6 @@ public class EmailService(IConfiguration config) : IEmailService
         email.Subject = subject;
         email.Body = new TextPart("html") { Text = htmlBody };
         using var smtp = new SmtpClient();
-        smtp.ServerCertificateValidationCallback = (_, _, _, _) => true;
         await smtp.ConnectAsync("smtp.gmail.com", 587, SecureSocketOptions.StartTls);
         await smtp.AuthenticateAsync(config["Email:From"]!, config["Email:Password"]!);
         await smtp.SendAsync(email);
