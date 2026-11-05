@@ -10,19 +10,29 @@ namespace QualiTrack.Controllers.SystemConfigs;
 
 [ApiController]
 [Route("api/system-config/capa-statuses")]
-[Authorize(Roles = "Admin")]
+[Authorize]
 
 public class CapaStatusController(AppDbContext db) : ControllerBase
 {
     private readonly AppDbContext _db = db;
 
     [HttpGet]
-    public async Task<IActionResult> GetCapaStatuses()
+    [Authorize(Roles = "Admin, QualityManager, AuditorInternal, Auditee")]
+    public async Task<IActionResult> GetCapaStatuses([FromQuery] bool includeInactive = false)
     {
-        var statuses = await _db.CapaStatuses
-            .Include(s => s.Capas)
-            .OrderBy(s => s.OrderIndex)
+        var showAll = includeInactive && User.IsInRole(UserRoles.Admin);
+
+        var query = _db.CapaStatuses
             .AsNoTracking()
+            .AsQueryable();
+
+        if (!showAll)
+        {
+            query = query.Where(s => s.IsActive);
+        }
+
+        var statuses = await query
+            .OrderBy(s => s.OrderIndex)
             .Select(s => new CapaStatusResponseDto
             {
                 Id = s.Id,
@@ -41,6 +51,7 @@ public class CapaStatusController(AppDbContext db) : ControllerBase
     }
 
     [HttpPost]
+    [Authorize(Roles = "Admin")]
     public async Task<IActionResult> CreateCapaStatus([FromBody] CreateCapaStatusDto dto)
     {
         var exists = await _db.CapaStatuses
@@ -86,6 +97,7 @@ public class CapaStatusController(AppDbContext db) : ControllerBase
     }
 
     [HttpPut("{id}")]
+    [Authorize(Roles = "Admin")]
     public async Task<IActionResult> UpdateCapaStatus(Guid id, [FromBody] UpdateCapaStatusDto dto)
     {
         var status = await _db.CapaStatuses.FindAsync(id);
@@ -129,6 +141,7 @@ public class CapaStatusController(AppDbContext db) : ControllerBase
     }
 
     [HttpDelete("{id}")]
+    [Authorize(Roles = "Admin")]
     public async Task<IActionResult> DeleteCapaStatus(Guid id)
     {
         var status = await _db.CapaStatuses
