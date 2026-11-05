@@ -9,12 +9,13 @@ namespace QualiTrack.Controllers.SystemConfigs;
 
 [ApiController]
 [Route("api/system-config/finding-categories")]
-[Authorize(Roles = "Admin")]
+[Authorize]
 public class FindingCategoryController(AppDbContext db) : ControllerBase
 {
     private readonly AppDbContext _db = db;
 
     [HttpGet]
+    [Authorize(Roles = "Admin, QualityManager, AuditorInternal, Auditee")]
     public async Task<IActionResult> GetFindingCategories()
     {
         var categories = await _db.FindingCategories
@@ -39,6 +40,7 @@ public class FindingCategoryController(AppDbContext db) : ControllerBase
     }
 
     [HttpPost]
+    [Authorize(Roles = "Admin")]
     public async Task<IActionResult> CreateFindingCategory([FromBody] CreateFindingCategoryDto dto)
     {
         var exists = await _db.FindingCategories
@@ -77,6 +79,7 @@ public class FindingCategoryController(AppDbContext db) : ControllerBase
     }
 
     [HttpPut("{id}")]
+    [Authorize(Roles = "Admin")]
     public async Task<IActionResult> UpdateFindingCategory(Guid id, [FromBody] UpdateFindingCategoryDto dto)
     {
         var category = await _db.FindingCategories.FindAsync(id);
@@ -115,6 +118,7 @@ public class FindingCategoryController(AppDbContext db) : ControllerBase
     }
 
     [HttpDelete("{id}")]
+    [Authorize(Roles = "Admin")]
     public async Task<IActionResult> DeleteFindingCategory(Guid id)
     {
         var category = await _db.FindingCategories
