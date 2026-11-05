@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
 using QualiTrack.Constants;
 using QualiTrack.Data;
 using QualiTrack.Models;
@@ -11,50 +12,49 @@ namespace QualiTrack.Controllers;
 [ApiController]
 [Route("api/dashboard")]
 [Authorize]
-public class DashboardController(AppDbContext db) : ControllerBase
+public class DashboardController(AppDbContext db, IMemoryCache cache) : ControllerBase
 {
-    // GET /api/dashboard/summary
-    // Audit Summary: active audit, total capa, capa open, capa overdue
     [HttpGet("summary")]
     [Authorize(Roles = "Admin,QualityManager,AuditorInternal,Auditee")]
     public async Task<IActionResult> GetSummary([FromQuery] int? year)
     {
-        var today = DateHelper.TodayWib();
-
-        // Filter audit session berdasarkan tahun (misal dari createdAt / schedule)
-        var activeAudit = await db.AuditSessions
-            .CountAsync(s => s.Status == AuditSessionStatus.InProgress
-                && (!year.HasValue || s.Schedule.AuditPlan.Year == year.Value));
-
-        var totalCapa = await db.CAPAs
-            .CountAsync();
-
-        var capaOpen = await db.CAPAs
-            .Include(c => c.Status)
-            .CountAsync(c => c.Status != null && !c.Status.IsTerminal);
-            
-        var capaOverdue = await db.CAPAs
-            .Include(c => c.Status)
-            .CountAsync(c => c.Deadline < today && c.Status != null && !c.Status.IsTerminal);
-
-        return Ok(new
+        var targetYear = year ?? DateTime.UtcNow.Year;
+        var cacheKey = $"dashboard_summary_{targetYear}";
+        var result = await cache.GetOrCreateAsync(cacheKey, async entry =>
         {
-            activeAudit,
-            totalCapa,
-            capaOpen,
-            capaOverdue
+            entry.AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(5);
+            var today = DateHelper.TodayWib();
+
+            var activeAudit = await db.AuditSessions
+                .CountAsync(s => s.Status == AuditSessionStatus.InProgress
+                    && (!year.HasValue || s.Schedule.AuditPlan.Year == year.Value));
+
+            var totalCapa = await db.CAPAs.CountAsync();
+
+            var capaOpen = await db.CAPAs
+                .CountAsync(c => c.Status != null && !c.Status.IsTerminal);
+
+            var capaOverdue = await db.CAPAs
+                .CountAsync(c => c.Deadline < today && c.Status != null && !c.Status.IsTerminal);
+
+            return new
+            {
+                activeAudit,
+                totalCapa,
+                capaOpen,
+                capaOverdue
+            };
         });
+
+        return Ok(result);
     }
 
-    // GET /api/dashboard/compliance-score
-    // Compliance Score per department
     [HttpGet("compliance-score")]
     [Authorize(Roles = "Admin,QualityManager,AuditorInternal,Auditee")]
     public async Task<IActionResult> GetComplianceScore([FromQuery] int? year)
     {
         var targetYear = year ?? DateTime.UtcNow.Year;
 
-        // Ambil semua session yang completed beserta responses
         var sessions = await db.AuditSessions
             .Where(s => s.Status == AuditSessionStatus.Completed
                      && s.Schedule != null
@@ -66,59 +66,57 @@ public class DashboardController(AppDbContext db) : ControllerBase
         if (!sessions.Any())
             return Ok(new { message = "Belum ada audit yang selesai", data = new List<object>() });
 
-        // Hitung compliance score per department
-        var scorePerDepartment = sessions
-            .Where(s => s.Schedule != null && s.Responses.Any())
-            .GroupBy(s => s.Schedule.Department)
-            .Select(g =>
-            {
-                var totalResponses = g.Sum(s => s.Responses.Count);
-                var conformResponses = g.Sum(s => s.Responses
-                    .Count(r => r.Answer == ResponseAnswer.Conform));
-
-                var score = totalResponses > 0
-                    ? Math.Round((double)conformResponses / totalResponses * 100, 1)
-                    : 0;
-
-                var monthlyBreakdown = g
-                    .GroupBy(s => s.Schedule.ScheduledDate.Month)
-                    .Select(mg =>
-                    {
-                        var mTotal = mg.Sum(s => s.Responses.Count);
-                        var mConform = mg.Sum(s => s.Responses
-                            .Count(r => r.Answer == ResponseAnswer.Conform));
-                        return new
-                        {
-                            month = mg.Key,
-                            score = mTotal > 0
-                                ? Math.Round((double)mConform / mTotal * 100, 1)
-                                : 0,
-                            totalResponses = mTotal,
-                            conformResponses = mConform
-                        };
-                    })
-                    .OrderBy(x => x.month)
-                    .ToList();
-                
-                return new
+            var scorePerDepartment = sessions
+                .Where(s => s.Schedule != null && s.Responses.Any())
+                .GroupBy(s => s.Schedule.Department)
+                .Select(g =>
                 {
-                    department = g.Key,
-                    score,
-                    totalAudit = g.Count(),
-                    totalResponses,
-                    conformResponses,
-                    monthlyBreakdown
-                };
-            })
-            .OrderByDescending(x => x.score)
-            .ToList();
+                    var totalResponses = g.Sum(s => s.Responses.Count);
+                    var conformResponses = g.Sum(s => s.Responses
+                        .Count(r => r.Answer == ResponseAnswer.Conform));
 
-        // Overall compliance score
-        var totalAll = scorePerDepartment.Sum(x => x.totalResponses);
-        var conformAll = scorePerDepartment.Sum(x => x.conformResponses);
-        var overallScore = totalAll > 0
-            ? Math.Round((double)conformAll / totalAll * 100, 1)
-            : 0;
+                    var score = totalResponses > 0
+                        ? Math.Round((double)conformResponses / totalResponses * 100, 1)
+                : 0;
+
+                    var monthlyBreakdown = g
+                        .GroupBy(s => s.Schedule.ScheduledDate.Month)
+                        .Select(mg =>
+                        {
+                            var mTotal = mg.Sum(s => s.Responses.Count);
+                            var mConform = mg.Sum(s => s.Responses
+                                .Count(r => r.Answer == ResponseAnswer.Conform));
+                            return new
+                            {
+                                month = mg.Key,
+                                score = mTotal > 0
+                                    ? Math.Round((double)mConform / mTotal * 100, 1)
+                                    : 0,
+                                totalResponses = mTotal,
+                                conformResponses = mConform
+                            };
+                        })
+                        .OrderBy(x => x.month)
+                        .ToList();
+
+                    return new
+                    {
+                        department = g.Key,
+                        score,
+                        totalAudit = g.Count(),
+                        totalResponses,
+                        conformResponses,
+                        monthlyBreakdown
+                    };
+                })
+                .OrderByDescending(x => x.score)
+                .ToList();
+
+            var totalAll = scorePerDepartment.Sum(x => x.totalResponses);
+            var conformAll = scorePerDepartment.Sum(x => x.conformResponses);
+            var overallScore = totalAll > 0
+                ? Math.Round((double)conformAll / totalAll * 100, 1)
+                : 0;
 
         return Ok(new
         {
@@ -127,7 +125,6 @@ public class DashboardController(AppDbContext db) : ControllerBase
         });
     }
 
-    // GET /api/dashboard/audit-schedule?month=10&year=2023
     [HttpGet("audit-schedule")]
     [Authorize(Roles = "Admin,QualityManager,AuditorInternal,Auditee")]
     public async Task<IActionResult> GetAuditSchedule(
@@ -144,7 +141,6 @@ public class DashboardController(AppDbContext db) : ControllerBase
             .OrderBy(s => s.ScheduledDate)
             .ToListAsync();
 
-        // Group by tanggal, tiap tanggal berisi list department
         var result = schedules
             .GroupBy(s => s.ScheduledDate.Day)
             .Select(g => new
@@ -169,8 +165,6 @@ public class DashboardController(AppDbContext db) : ControllerBase
         });
     }
 
-    // GET /api/dashboard/monthly-report?month=5&year=2026
-    // Monthly Compliance Report untuk PDF
     [HttpGet("monthly-report")]
     [Authorize(Roles = "Admin,QualityManager,AuditorInternal,Auditee")]
     public async Task<IActionResult> GetMonthlyReport(
@@ -180,7 +174,6 @@ public class DashboardController(AppDbContext db) : ControllerBase
         var targetMonth = month ?? DateTime.UtcNow.Month;
         var targetYear = year ?? DateTime.UtcNow.Year;
 
-        // Audit schedules bulan ini
         var schedulesQuery = db.AuditSchedules
             .Where(s => s.ScheduledDate.Month == targetMonth
                 && s.ScheduledDate.Year == targetYear);
@@ -192,13 +185,11 @@ public class DashboardController(AppDbContext db) : ControllerBase
 
         var scheduleIds = await schedulesQuery.Select(s => s.Id).ToListAsync();
 
-        // Sessions bulan ini - filter langsung di query
         var sessions = await db.AuditSessions
             .Where(s => scheduleIds.Contains(s.ScheduleId))
             .Include(s => s.Responses)
             .ToListAsync();
 
-        // Findings bulan ini
         var sessionIds = sessions.Select(s => s.Id).ToList();
         var findings = await db.Findings
             .Include(f => f.Category)
@@ -206,14 +197,12 @@ public class DashboardController(AppDbContext db) : ControllerBase
             .Include(f => f.Category)
             .ToListAsync();
 
-        // CAPA bulan ini
         var findingIds = findings.Select(f => f.Id).ToList();
         var capas = await db.CAPAs
             .Where(c => findingIds.Contains(c.FindingId))
             .Include(c => c.Status)
             .ToListAsync();
 
-        // Hitung compliance score
         var totalResponses = sessions.Sum(s => s.Responses.Count);
         var conformResponses = sessions.Sum(s => s.Responses
             .Count(r => r.Answer == ResponseAnswer.Conform));
