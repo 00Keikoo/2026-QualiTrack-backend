@@ -1,25 +1,37 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
 using QualiTrack.Data;
 using QualiTrack.DTOs;
 using QualiTrack.Models;
+using QualiTrack.Helpers;
 
 namespace QualiTrack.Services;
 
-public class QualityScoreService(AppDbContext db) : IQualityScoreService
+public class QualityScoreService(AppDbContext db, IMemoryCache cache) : IQualityScoreService
 {
     public async Task<List<QualityTrendDto>> GetQualityTrendsAsync(int year)
     {
-        var sessions = await db.AuditSessions
-            .Include(s => s.Schedule)
-            .Include(s => s.Responses)
-            .Where(s => s.Status == AuditSessionStatus.Completed
-                && s.CompletedAt.HasValue
-                && s.CompletedAt.Value.Year == year)
-            .ToListAsync();
+        var cacheKey = CacheKeys.QualityTrends(year);
 
-        var grouped = sessions
-            .GroupBy(s => s.CompletedAt!.Value.Month)
-            .Select(g =>
+        return await cache.GetOrCreateAsync(cacheKey, async entry =>
+        {
+            entry.AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(15);
+
+            var sessions = await db.AuditSessions
+                .Where(s => s.Status == AuditSessionStatus.Completed
+                    && s.CompletedAt.HasValue
+                    && s.CompletedAt.Value.Year == year)
+                .Select(s => new
+                {
+                    s.CompletedAt,
+                    s.Schedule.ScheduledDate,
+                    Responses = s.Responses.Select(r => r.Answer).ToList()
+                })
+                .ToListAsync();
+
+            var grouped = sessions
+                .GroupBy(s => s.CompletedAt!.Value.Month)
+                .Select(g =>
                 {
                     int totalItems = 0;
                     int totalConform = 0;
@@ -27,39 +39,43 @@ public class QualityScoreService(AppDbContext db) : IQualityScoreService
 
                     foreach (var session in g)
                     {
-                        var conformCount = session.Responses.Count(r => r.Answer == ResponseAnswer.Conform);
+                        var conformCount = session.Responses.Count(r => r == ResponseAnswer.Conform);
                         var itemCount = session.Responses.Count;
 
                         if (itemCount == 0) continue;
 
-                        var isOverdue = session.CompletedAt.HasValue && session.CompletedAt.Value > session.Schedule.ScheduledDate;
-                        // Penalti -1 untuk audit yang selesai terlambat (business rule)
-                        var adjustedConform = isOverdue ? Math.Max(0, conformCount - 1) : conformCount;
+                        var isOverdue = session.CompletedAt.HasValue 
+                        && session.CompletedAt.Value > session.ScheduledDate;
+                        var adjustedConform = isOverdue 
+                            ? Math.Max(0, conformCount - 1) : conformCount;
 
                         totalItems += itemCount;
                         totalConform += conformCount;
                         totalAdjustedConform += adjustedConform;
                     }
+
                     return new QualityTrendDto
                     {
                         Period = g.Key,
-                        PeriodLabel = new DateTime(year, g.Key, 1).ToString("MMM yyyy"),
+                        PeriodLabel = new DateTime(year, g.Key, 1).ToString("MM yyyy"),
                         TotalSessions = g.Count(),
-                        // ComplianceScore : skor setelah penalti keterlambatan
-                        ComplianceScore = totalItems == 0 ? 0 : Math.Round((double)totalAdjustedConform / totalItems * 100, 1),
-                        // QualityScore : skor mentah tanpa penalti
-                        QualityScore = totalConform == 0 ? 0 : Math.Round((double)totalConform / totalItems * 100, 1)
+                        ComplianceScore = totalItems == 0 ? 0 :
+                            Math.Round((double)totalAdjustedConform / totalItems * 100, 1),
+                        QualityScore = totalConform == 0 ? 0 :
+                            Math.Round((double)totalConform / totalItems * 100, 1)
                     };
                 })
-            .OrderBy(x => x.Period)
-            .ToList();
-        return grouped;
+                .OrderBy(x => x.Period)
+                .ToList();
+
+            return grouped;
+        }) ?? new List<QualityTrendDto>();
     }
 
     public async Task<List<DepartmentTrendDto>> GetDepartmentComplianceTrendAsync(string timeframe)
     {
         var startOfCurrentMonth = new DateTime(DateTime.UtcNow.Year, DateTime.UtcNow.Month, 1);
-        
+
         DateTime? cutoff = timeframe.ToLower() switch
         {
             "3m" => startOfCurrentMonth.AddMonths(-3),
@@ -75,21 +91,21 @@ public class QualityScoreService(AppDbContext db) : IQualityScoreService
                 && s.CompletedAt.HasValue)
             .AsQueryable();
 
-        
+
         // Exclude bulan berjalan HANYA untuk timeframe yang membandingkan periode closed
         query = query.Where(s => s.CompletedAt!.Value < startOfCurrentMonth);
-            
+
         if (cutoff.HasValue)
             query = query.Where(s => s.CompletedAt!.Value >= cutoff.Value);
-    
+
         var sessions = await query.ToListAsync();
-    
+
         var result = sessions
             .GroupBy(s => s.Schedule.Department)
             .Select(deptGroup =>
             {
                 var periodData = deptGroup
-                    .GroupBy(s => new { s.CompletedAt!.Value.Year, s.CompletedAt.Value.Month})
+                    .GroupBy(s => new { s.CompletedAt!.Value.Year, s.CompletedAt.Value.Month })
                     .Select(periodGroup =>
                     {
                         var totalItems = periodGroup.Sum(s => s.Responses.Count);
@@ -101,7 +117,7 @@ public class QualityScoreService(AppDbContext db) : IQualityScoreService
                             Month = periodGroup.Key.Month,
                             PeriodLabel = new DateTime(periodGroup.Key.Year, periodGroup.Key.Month, 1).ToString("MMM yyyy"),
                             TotalSessions = periodGroup.Count(),
-                            ComplianceScore = totalItems == 0 ? 0 : Math.Round((double) totalConform / totalItems * 100, 1)
+                            ComplianceScore = totalItems == 0 ? 0 : Math.Round((double)totalConform / totalItems * 100, 1)
                         };
                     })
                     .OrderBy(p => p.Year).ThenBy(p => p.Month)
@@ -112,7 +128,7 @@ public class QualityScoreService(AppDbContext db) : IQualityScoreService
                     periodData[i].PreviousScore = periodData[i - 1].ComplianceScore;
                     periodData[i].Difference = Math.Round(periodData[i].ComplianceScore - periodData[i - 1].ComplianceScore, 1);
                     var diff = periodData[i].Difference ?? 0;
-                    periodData [i].Trend = Math.Abs(diff) < 0.1 ? "stable"
+                    periodData[i].Trend = Math.Abs(diff) < 0.1 ? "stable"
                         : diff > 0 ? "up" : "down";
                 }
 
@@ -124,14 +140,14 @@ public class QualityScoreService(AppDbContext db) : IQualityScoreService
             })
             .OrderBy(d => d.Department)
             .ToList();
-    
+
         return result;
     }
 
     public async Task<List<OverallTrendDto>> GetOverallComplianceTrendAsync(string timeframe)
     {
         var departmentTrends = await GetDepartmentComplianceTrendAsync(timeframe);
-    
+
         var result = departmentTrends
             .SelectMany(d => d.Data)
             .GroupBy(p => new { p.Year, p.Month })
@@ -153,7 +169,7 @@ public class QualityScoreService(AppDbContext db) : IQualityScoreService
             result[i].Difference = Math.Round(diff, 1);
             result[i].Trend = Math.Abs(diff) < 0.1 ? "stable" : diff > 0 ? "up" : "down";
         }
-    
+
         return result;
     }
 }
