@@ -10,7 +10,7 @@ public class EvidenceFile
     public long FileSizeBytes { get; set; }
     public DateTime UploadedAt { get; set; } = DateTime.UtcNow;
     // Foreign Keys
-    public Guid? FindingId { get; set; } 
+    public Guid? FindingId { get; set; }
     public Guid? AuditResponseId { get; set; }
     public Guid? CapaActionId { get; set; }
     // Navigation Properties

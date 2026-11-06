@@ -9,3 +9,4 @@ appsettings.Development.json
 uploads/
 .env
 Laporan/
+private-reports/

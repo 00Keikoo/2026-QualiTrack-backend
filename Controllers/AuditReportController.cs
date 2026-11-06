@@ -92,8 +92,8 @@ public class AuditReportController(
                 CompletedAt = s.CompletedAt,
                 SummaryContent = s.Summary?.Content,
                 TotalFindings = s.Findings.Count,
-                TotalMajorNC = s.Findings.Count(f => f.Category!.Name == DefaultCategories.Major),
-                TotalMinorNC = s.Findings.Count(f => f.Category!.Name == DefaultCategories.Minor),
+                TotalMajorNC = s.Findings.Count(f => f.Category?.Name == DefaultCategories.Major),
+                TotalMinorNC = s.Findings.Count(f => f.Category?.Name == DefaultCategories.Minor),
                 TotalCAPAs = s.Findings.Count(f => f.Capa != null),
                 ClosedCAPAs = s.Findings.Count(f => f.Capa != null && f.Capa.Status!.IsTerminal)
             };
@@ -153,7 +153,7 @@ public class AuditReportController(
             {
                 Id = f.Id,
                 Title = f.Title,
-                Category = f.Category!.Name,
+                Category = f.Category?.Name ?? string.Empty,
                 Description = f.Description,
                 ClauseRef = f.ClauseRef,
                 Status = f.Status!.ToString(),
