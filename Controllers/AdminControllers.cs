@@ -14,7 +14,7 @@ namespace QualiTrack.Controllers;
 
 [ApiController]
 [Route("api/admin")]
-[Authorize(Roles = "Admin")]
+[Authorize]
 [ValidateModelAttribute]
 public class AdminController(AppDbContext db, IAdminActivityService activityService, IMemoryCache cache) : ControllerBase
 {
@@ -25,6 +25,7 @@ public class AdminController(AppDbContext db, IAdminActivityService activityServ
     // GET /api/admin/users
     // Daftar semua user dengan filter dan search
     [HttpGet("users")]
+    [Authorize(Roles = UserRoles.AllRolesCsv)]
     public async Task<IActionResult> GetUsers(
         [FromQuery] string? search,
         [FromQuery] string? role,
@@ -69,6 +70,7 @@ public class AdminController(AppDbContext db, IAdminActivityService activityServ
     // GET /api/admin/users/{id}
     // Detail satu user
     [HttpGet("users/{id}")]
+    [Authorize(Roles = UserRoles.AllRolesCsv)]
     public async Task<IActionResult> GetUserById(Guid id)
     {
         var user = await db.Users
@@ -94,6 +96,7 @@ public class AdminController(AppDbContext db, IAdminActivityService activityServ
     // PUT /api/admin/users/{id}
     // Update nama dan email user
     [HttpPut("users/{id}")]
+    [Authorize(Roles = UserRoles.Admin)]
     public async Task<IActionResult> UpdateUser(Guid id, [FromBody] UpdateUserRequest req)
     {
         var user = await db.Users.FindAsync(id);
@@ -116,6 +119,7 @@ public class AdminController(AppDbContext db, IAdminActivityService activityServ
     // PATCH /api/admin/users/{id}/role
     // Update role user
     [HttpPatch("users/{id}/role")]
+    [Authorize(Roles = UserRoles.Admin)]
     public async Task<IActionResult> UpdateUserRole(Guid id, [FromBody] UpdateUserRoleRequest req)
     {
         var currentUserId = Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
@@ -152,6 +156,7 @@ public class AdminController(AppDbContext db, IAdminActivityService activityServ
     // PATCH /api/admin/users/{id}/status
     // Aktifkan/nonaktifkan user
     [HttpPatch("users/{id}/status")]
+    [Authorize(Roles = UserRoles.Admin)]
     public async Task<IActionResult> UpdateUserStatus(Guid id, [FromBody] UpdateUserStatusRequest req)
     {
         var currentUserId = Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
@@ -193,6 +198,7 @@ public class AdminController(AppDbContext db, IAdminActivityService activityServ
     // ISO STANDARD MANAGEMENT
     // GET /api/admin/iso-standards
     [HttpGet("iso-standards")]
+    [Authorize(Roles = UserRoles.AllRolesCsv)]
     public async Task<IActionResult> GetIsoStandards([FromQuery] bool? isActive)
     {
         var query = db.IsoStandards.AsNoTracking().AsQueryable();
@@ -218,6 +224,7 @@ public class AdminController(AppDbContext db, IAdminActivityService activityServ
 
     // GET /api/admin/iso-standards/{id}
     [HttpGet("iso-standards/{id}")]
+    [Authorize(Roles = UserRoles.AllRolesCsv)]
     public async Task<IActionResult> GetIsoStandardById(Guid id)
     {
         var iso = await db.IsoStandards
@@ -240,6 +247,7 @@ public class AdminController(AppDbContext db, IAdminActivityService activityServ
 
     // POST /api/admin/iso-standards
     [HttpPost("iso-standards")]
+    [Authorize(Roles = UserRoles.Admin)]
     public async Task<IActionResult> CreateIsoStandard([FromBody] CreateIsoStandardRequest req)
     {
         var adminId = Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
@@ -283,6 +291,7 @@ public class AdminController(AppDbContext db, IAdminActivityService activityServ
 
     // PUT /api/admin/iso-standards/{id}
     [HttpPut("iso-standards/{id}")]
+    [Authorize(Roles = UserRoles.Admin)]
     public async Task<IActionResult> UpdateIsoStandard(Guid id, [FromBody] UpdateIsoStandardRequest req)
     {
         var adminId = Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
@@ -314,6 +323,7 @@ public class AdminController(AppDbContext db, IAdminActivityService activityServ
 
     // PATCH /api/admin/iso-standards/{id}/status
     [HttpPatch("iso-standards/{id}/status")]
+    [Authorize(Roles = UserRoles.Admin)]
     public async Task<IActionResult> UpdateIsoStandardStatus(Guid id, [FromBody] bool isActive)
     {
         var adminId = Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
@@ -341,6 +351,7 @@ public class AdminController(AppDbContext db, IAdminActivityService activityServ
 
     // GET /api/admin/spc-units
     [HttpGet("spc-units")]
+    [Authorize(Roles = UserRoles.AllRolesCsv)]
     public async Task<IActionResult> GetSpcUnits([FromQuery] bool? isActive)
     {
         var query = db.SpcUnits.AsNoTracking().AsQueryable();
@@ -366,6 +377,7 @@ public class AdminController(AppDbContext db, IAdminActivityService activityServ
 
     // GET /api/admin/spc-units/{id}
     [HttpGet("spc-units/{id}")]
+    [Authorize(Roles = UserRoles.AllRolesCsv)]
     public async Task<IActionResult> GetSpcUnitById(Guid id)
     {
         var unit = await db.SpcUnits
@@ -388,6 +400,7 @@ public class AdminController(AppDbContext db, IAdminActivityService activityServ
 
     // POST /api/admin/spc-units
     [HttpPost("spc-units")]
+    [Authorize(Roles = UserRoles.Admin)]
     public async Task<IActionResult> CreateSpcUnit([FromBody] CreateSpcUnitRequest req)
     {
         var adminId = Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
@@ -431,6 +444,7 @@ public class AdminController(AppDbContext db, IAdminActivityService activityServ
 
     // PUT /api/admin/spc-units/{id}
     [HttpPut("spc-units/{id}")]
+    [Authorize(Roles = UserRoles.Admin)]
     public async Task<IActionResult> UpdateSpcUnit(Guid id, [FromBody] UpdateSpcUnitRequest req)
     {
         var adminId = Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
@@ -462,6 +476,7 @@ public class AdminController(AppDbContext db, IAdminActivityService activityServ
 
     // PATCH /api/admin/spc-units/{id}/status
     [HttpPatch("spc-units/{id}/status")]
+    [Authorize(Roles = UserRoles.Admin)]
     public async Task<IActionResult> UpdateSpcUnitStatus(Guid id, [FromBody] bool isActive)
     {
         var adminId = Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);

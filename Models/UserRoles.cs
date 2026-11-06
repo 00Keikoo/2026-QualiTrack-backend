@@ -8,6 +8,10 @@ public static class UserRoles
     public const string Auditee = "Auditee";
     
     public static readonly string[] AllRoles = { Admin, QualityManager, AuditorInternal, Auditee };
+
+    // Versi string untuk dipakai di atribut [Authorize(Roles = ...)].
+    // Nilai atribut harus konstanta compile-time, jadi daftar ini ditulis manual.
+    public const string AllRolesCsv = "Admin,QualityManager,AuditorInternal,Auditee";
     
     public static bool IsValidRole(string role)
     {
