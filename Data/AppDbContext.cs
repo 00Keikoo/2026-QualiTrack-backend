@@ -86,7 +86,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
 
         mb.Entity<EvidenceFile>()
             .HasOne(e => e.CapaAction)
-            .WithMany()
+            .WithMany(c => c.Evidences)
             .HasForeignKey(e => e.CapaActionId)
             .OnDelete(DeleteBehavior.Cascade)
             .IsRequired(false);
