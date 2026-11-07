@@ -52,7 +52,7 @@ namespace QualiTrack.Migrations
 
                     b.HasIndex("AdminId");
 
-                    b.ToTable("AdminActivityLogs", (string)null);
+                    b.ToTable("AdminActivityLogs");
                 });
 
             modelBuilder.Entity("QualiTrack.Models.AuditPlan", b =>
@@ -83,7 +83,7 @@ namespace QualiTrack.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("AuditPlans", (string)null);
+                    b.ToTable("AuditPlans");
                 });
 
             modelBuilder.Entity("QualiTrack.Models.AuditResponse", b =>
@@ -111,7 +111,7 @@ namespace QualiTrack.Migrations
 
                     b.HasIndex("SessionId");
 
-                    b.ToTable("AuditResponses", (string)null);
+                    b.ToTable("AuditResponses");
                 });
 
             modelBuilder.Entity("QualiTrack.Models.AuditSchedule", b =>
@@ -147,7 +147,7 @@ namespace QualiTrack.Migrations
 
                     b.HasIndex("AuditorId");
 
-                    b.ToTable("AuditSchedules", (string)null);
+                    b.ToTable("AuditSchedules");
                 });
 
             modelBuilder.Entity("QualiTrack.Models.AuditSession", b =>
@@ -186,7 +186,7 @@ namespace QualiTrack.Migrations
 
                     b.HasIndex("Status", "CompletedAt");
 
-                    b.ToTable("AuditSessions", (string)null);
+                    b.ToTable("AuditSessions");
                 });
 
             modelBuilder.Entity("QualiTrack.Models.AuditSummary", b =>
@@ -210,7 +210,7 @@ namespace QualiTrack.Migrations
                     b.HasIndex("AuditSessionId")
                         .IsUnique();
 
-                    b.ToTable("AuditSummaries", (string)null);
+                    b.ToTable("AuditSummaries");
                 });
 
             modelBuilder.Entity("QualiTrack.Models.CAPA", b =>
@@ -259,7 +259,7 @@ namespace QualiTrack.Migrations
 
                     b.HasIndex("StatusId", "Deadline");
 
-                    b.ToTable("CAPAs", (string)null);
+                    b.ToTable("CAPAs");
                 });
 
             modelBuilder.Entity("QualiTrack.Models.CAPAAction", b =>
@@ -287,7 +287,7 @@ namespace QualiTrack.Migrations
 
                     b.HasIndex("DoneById");
 
-                    b.ToTable("CAPAActions", (string)null);
+                    b.ToTable("CAPAActions");
                 });
 
             modelBuilder.Entity("QualiTrack.Models.CapaStatus", b =>
@@ -331,7 +331,7 @@ namespace QualiTrack.Migrations
                     b.HasIndex("Name")
                         .IsUnique();
 
-                    b.ToTable("CapaStatuses", (string)null);
+                    b.ToTable("CapaStatuses");
                 });
 
             modelBuilder.Entity("QualiTrack.Models.Checklist", b =>
@@ -373,7 +373,7 @@ namespace QualiTrack.Migrations
                     b.HasIndex("Title", "DepartmentId")
                         .IsUnique();
 
-                    b.ToTable("Checklists", (string)null);
+                    b.ToTable("Checklists");
                 });
 
             modelBuilder.Entity("QualiTrack.Models.ChecklistItem", b =>
@@ -403,7 +403,7 @@ namespace QualiTrack.Migrations
 
                     b.HasIndex("ChecklistId");
 
-                    b.ToTable("ChecklistItems", (string)null);
+                    b.ToTable("ChecklistItems");
                 });
 
             modelBuilder.Entity("QualiTrack.Models.CloseOutVerification", b =>
@@ -435,7 +435,7 @@ namespace QualiTrack.Migrations
 
                     b.HasIndex("VerifiedById");
 
-                    b.ToTable("CloseOutVerifications", (string)null);
+                    b.ToTable("CloseOutVerifications");
                 });
 
             modelBuilder.Entity("QualiTrack.Models.Department", b =>
@@ -480,7 +480,7 @@ namespace QualiTrack.Migrations
                     b.HasIndex("Name")
                         .IsUnique();
 
-                    b.ToTable("Departments", (string)null);
+                    b.ToTable("Departments");
                 });
 
             modelBuilder.Entity("QualiTrack.Models.EvidenceFile", b =>
@@ -524,7 +524,7 @@ namespace QualiTrack.Migrations
 
                     b.HasIndex("FindingId");
 
-                    b.ToTable("EvidenceFiles", (string)null);
+                    b.ToTable("EvidenceFiles");
                 });
 
             modelBuilder.Entity("QualiTrack.Models.Finding", b =>
@@ -582,7 +582,7 @@ namespace QualiTrack.Migrations
 
                     b.HasIndex("Status");
 
-                    b.ToTable("Findings", (string)null);
+                    b.ToTable("Findings");
                 });
 
             modelBuilder.Entity("QualiTrack.Models.FindingCategory", b =>
@@ -626,7 +626,7 @@ namespace QualiTrack.Migrations
                     b.HasIndex("Name")
                         .IsUnique();
 
-                    b.ToTable("FindingCategories", (string)null);
+                    b.ToTable("FindingCategories");
                 });
 
             modelBuilder.Entity("QualiTrack.Models.IsoStandard", b =>
@@ -657,7 +657,7 @@ namespace QualiTrack.Migrations
                     b.HasIndex("Code")
                         .IsUnique();
 
-                    b.ToTable("IsoStandards", (string)null);
+                    b.ToTable("IsoStandards");
                 });
 
             modelBuilder.Entity("QualiTrack.Models.SpcAnalysis", b =>
@@ -727,7 +727,7 @@ namespace QualiTrack.Migrations
 
                     b.HasIndex("AnalyzedById");
 
-                    b.ToTable("SpcAnalyses", (string)null);
+                    b.ToTable("SpcAnalyses");
                 });
 
             modelBuilder.Entity("QualiTrack.Models.SpcUnit", b =>
@@ -758,7 +758,7 @@ namespace QualiTrack.Migrations
                     b.HasIndex("Name")
                         .IsUnique();
 
-                    b.ToTable("SpcUnits", (string)null);
+                    b.ToTable("SpcUnits");
                 });
 
             modelBuilder.Entity("QualiTrack.Models.SystemConfig", b =>
@@ -786,7 +786,7 @@ namespace QualiTrack.Migrations
                     b.HasIndex("Key")
                         .IsUnique();
 
-                    b.ToTable("SystemConfigs", (string)null);
+                    b.ToTable("SystemConfigs");
                 });
 
             modelBuilder.Entity("QualiTrack.Models.User", b =>
@@ -809,10 +809,16 @@ namespace QualiTrack.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
+                    b.Property<int>("OtpAttempts")
+                        .HasColumnType("integer");
+
                     b.Property<string>("OtpCode")
                         .HasColumnType("text");
 
                     b.Property<DateTime?>("OtpExpiry")
+                        .HasColumnType("timestamp without time zone");
+
+                    b.Property<DateTime?>("OtpLockoutEnd")
                         .HasColumnType("timestamp without time zone");
 
                     b.Property<string>("PasswordHash")
@@ -841,7 +847,7 @@ namespace QualiTrack.Migrations
                     b.HasIndex("Email")
                         .IsUnique();
 
-                    b.ToTable("Users", (string)null);
+                    b.ToTable("Users");
                 });
 
             modelBuilder.Entity("QualiTrack.Models.AdminActivityLog", b =>

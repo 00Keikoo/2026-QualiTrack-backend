@@ -221,7 +221,7 @@ public class CapaController(AppDbContext db) : ControllerBase
     }
 
     [HttpPut("{id}")]
-    [Authorize(Roles = "Admin,QualityManager,AuditorInternal,Auditee")]
+    [Authorize(Roles = "QualityManager,AuditorInternal")]
     public async Task<IActionResult> Update(Guid id, [FromBody] UpdateCapaRequestDto req)
     {
         var capa = await db.CAPAs.FindAsync(id);
@@ -283,7 +283,7 @@ public class CapaController(AppDbContext db) : ControllerBase
     }
 
     [HttpPost("{id}/actions")]
-    [Authorize(Roles = "Admin,QualityManager,AuditorInternal,Auditee")]
+    [Authorize(Roles = "QualityManager,AuditorInternal")]
     public async Task<IActionResult> AddAction(Guid id, [FromBody] AddCapaActionRequest req)
     {
         var capa = await db.CAPAs
