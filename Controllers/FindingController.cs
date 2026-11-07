@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using System.Security.Claims;
 using QualiTrack.Data;
 using QualiTrack.DTOs;
 using QualiTrack.Filters;
@@ -85,14 +86,25 @@ public class FindingController(AppDbContext db) : ControllerBase
     }
 
     [HttpPost]
-    [Authorize(Roles = "Admin,QualityManager,AuditorInternal")]
+    [Authorize(Roles = "Admin,QualityManager,AuditorInternal,Auditee")]
     public async Task<IActionResult> Create([FromBody] CreateFindingRequest req)
     {
         // Auto-resolve ReporterName dari ReporterId kalau diisi
         string reporterName = req.ReporterName;
-        if (req.ReporterId.HasValue && string.IsNullOrEmpty(reporterName))
+        Guid? reporterId = req.ReporterId;
+
+        // Auditee hanya boleh membuat finding atas nama dirinya sendiri, jadi
+        // ReporterId/Nama dipaksa berasal dari klaim JWT (tidak bisa dipalsukan).
+        if (User.IsInRole("Auditee"))
         {
-            var reporter = await db.Users.FindAsync(req.ReporterId.Value);
+            var userId = Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
+            var reporter = await db.Users.FindAsync(userId);
+            reporterId = userId;
+            reporterName = reporter?.FullName ?? reporterName;
+        }
+        else if (reporterId.HasValue && string.IsNullOrEmpty(reporterName))
+        {
+            var reporter = await db.Users.FindAsync(reporterId.Value);
             reporterName = reporter?.FullName ?? string.Empty;
         }
 
@@ -124,7 +136,7 @@ public class FindingController(AppDbContext db) : ControllerBase
             SessionId = req.SessionId,
             ChecklistItemId = req.ChecklistItemId,
             ReporterName = reporterName,
-            ReporterId = req.ReporterId,
+            ReporterId = reporterId,
             CategoryId = categoryId,
             Description = req.Description,
             ClauseRef = req.ClauseRef,
@@ -142,13 +154,20 @@ public class FindingController(AppDbContext db) : ControllerBase
     }
 
     [HttpPut("{id}")]
-    [Authorize(Roles = "Admin,QualityManager,AuditorInternal")]
+    [Authorize(Roles = "Admin,QualityManager,AuditorInternal,Auditee")]
     public async Task<IActionResult> Update(Guid id, [FromBody] UpdateFindingRequest req)
     {
         var finding = await db.Findings.FindAsync(id);
         if (finding is null) return NotFound(new { message = "Finding tidak ditemukan" });
 
-        if (req.ReporterId.HasValue)
+        // Auditee hanya boleh mengedit finding yang dia buat sendiri.
+        if (User.IsInRole("Auditee"))
+        {
+            var userId = Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
+            if (finding.ReporterId != userId)
+                return Forbid();
+        }
+        else if (req.ReporterId.HasValue)
         {
             finding.ReporterId = req.ReporterId;
             if (!string.IsNullOrEmpty(req.ReporterName))
@@ -190,6 +209,7 @@ public class FindingController(AppDbContext db) : ControllerBase
         return NoContent();
     }
 
+    // Hanya Admin yang boleh menghapus finding (Auditee dan role lain tidak bisa delete).
     [HttpDelete("{id}")]
     [Authorize(Roles = "Admin")]
     public async Task<IActionResult> Delete(Guid id)
