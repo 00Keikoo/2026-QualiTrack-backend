@@ -20,16 +20,7 @@ public class CapaController(AppDbContext db) : ControllerBase
     [Authorize(Roles = "Admin,QualityManager,AuditorInternal,Auditee")]
     public async Task<IActionResult> GetAll([FromQuery] string? statusName)
     {
-        var query = db.CAPAs
-            .Include(c => c.Actions)
-                .ThenInclude(a => a.DoneBy)
-            .Include(c => c.CloseOut)
-                .ThenInclude(co => co!.VerifiedBy)
-            .Include(c => c.Pic)
-            .Include(c => c.Finding!)
-                .ThenInclude(f => f.Category!)
-            .Include(c => c.Status)
-            .AsQueryable();
+        var query = db.CAPAs.AsQueryable();
 
         if (!string.IsNullOrEmpty(statusName))
             query = query.Where(c => c.Status!.Name == statusName);
@@ -39,8 +30,48 @@ public class CapaController(AppDbContext db) : ControllerBase
             var userId = Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
             query = query.Where(c => c.PicId == userId);
         }
-        var capas = await query.ToListAsync();
-        var response = capas.Select(MapToResponseDto).ToList();
+
+        var response = await query
+            .AsSplitQuery()
+            .Select(c => new CAPAResponseDto
+            {
+                Id = c.Id,
+                FindingId = c.FindingId,
+                FindingTitle = c.Finding != null
+                    ? (string.IsNullOrEmpty(c.Finding.ClauseRef) ? c.Finding.Title : c.Finding.ClauseRef + " - " + c.Finding.Title)
+                    : string.Empty,
+                FindingCategory = c.Finding != null && c.Finding.Category != null ? c.Finding.Category.Name : string.Empty,
+                RootCause = c.RootCause,
+                CorrectiveAction = c.CorrectiveAction,
+                PreventiveAction = c.PreventiveAction,
+                Deadline = c.Deadline,
+                StatusId = c.StatusId,
+                StatusName = c.Status != null ? c.Status.Name : string.Empty,
+                PicId = c.PicId,
+                PicName = c.Pic != null ? c.Pic.FullName : null,
+                CreatedAt = c.CreatedAt,
+                ClosedAt = c.ClosedAt,
+                Actions = c.Actions.Select(a => new CAPAActionResponseDto
+                {
+                    Id = a.Id,
+                    CapaId = a.CapaId,
+                    Description = a.Description,
+                    DoneById = a.DoneById,
+                    DoneByName = a.DoneBy != null ? a.DoneBy.FullName : null,
+                    DoneAt = a.DoneAt
+                }).ToList(),
+                CloseOut = c.CloseOut == null ? null : new CloseOutResponseDto
+                {
+                    Id = c.CloseOut.Id,
+                    CapaId = c.CloseOut.CapaId,
+                    IsEffective = c.CloseOut.IsEffective,
+                    VerificationNotes = c.CloseOut.VerificationNotes,
+                    VerifiedById = c.CloseOut.VerifiedById,
+                    VerifiedByName = c.CloseOut.VerifiedBy != null ? c.CloseOut.VerifiedBy.FullName : null,
+                    VerifiedAt = c.CloseOut.VerifiedAt
+                }
+            })
+            .ToListAsync();
 
         return Ok(response);
     }
@@ -52,11 +83,6 @@ public class CapaController(AppDbContext db) : ControllerBase
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
         var query = db.CAPAs
             .Where(c => c.Deadline < today && !c.Status!.IsTerminal)
-            .Include(c => c.Actions)
-            .Include(c => c.Pic)
-            .Include(c => c.Status)
-            .Include(c => c.Finding!)
-                .ThenInclude(f => f.Category!)
             .AsQueryable();
 
         if (User.IsInRole("Auditee"))
@@ -65,8 +91,48 @@ public class CapaController(AppDbContext db) : ControllerBase
             query = query.Where(c => c.PicId == userId);
         }
 
-        var overdue  = await query.ToListAsync();
-        var response = overdue.Select(c => MapToResponseDto(c)).ToList();
+        var response = await query
+            .AsSplitQuery()
+            .Select(c => new CAPAResponseDto
+            {
+                Id = c.Id,
+                FindingId = c.FindingId,
+                FindingTitle = c.Finding != null
+                    ? (string.IsNullOrEmpty(c.Finding.ClauseRef) ? c.Finding.Title : c.Finding.ClauseRef + " - " + c.Finding.Title)
+                    : string.Empty,
+                FindingCategory = c.Finding != null && c.Finding.Category != null ? c.Finding.Category.Name : string.Empty,
+                RootCause = c.RootCause,
+                CorrectiveAction = c.CorrectiveAction,
+                PreventiveAction = c.PreventiveAction,
+                Deadline = c.Deadline,
+                StatusId = c.StatusId,
+                StatusName = c.Status != null ? c.Status.Name : string.Empty,
+                PicId = c.PicId,
+                PicName = c.Pic != null ? c.Pic.FullName : null,
+                CreatedAt = c.CreatedAt,
+                ClosedAt = c.ClosedAt,
+                Actions = c.Actions.Select(a => new CAPAActionResponseDto
+                {
+                    Id = a.Id,
+                    CapaId = a.CapaId,
+                    Description = a.Description,
+                    DoneById = a.DoneById,
+                    DoneByName = a.DoneBy != null ? a.DoneBy.FullName : null,
+                    DoneAt = a.DoneAt
+                }).ToList(),
+                CloseOut = c.CloseOut == null ? null : new CloseOutResponseDto
+                {
+                    Id = c.CloseOut.Id,
+                    CapaId = c.CloseOut.CapaId,
+                    IsEffective = c.CloseOut.IsEffective,
+                    VerificationNotes = c.CloseOut.VerificationNotes,
+                    VerifiedById = c.CloseOut.VerifiedById,
+                    VerifiedByName = c.CloseOut.VerifiedBy != null ? c.CloseOut.VerifiedBy.FullName : null,
+                    VerifiedAt = c.CloseOut.VerifiedAt
+                }
+            })
+            .ToListAsync();
+
         return Ok(response);
     }
 
@@ -96,7 +162,7 @@ public class CapaController(AppDbContext db) : ControllerBase
     }
 
     [HttpPost("finding/{findingId}")]
-    [Authorize(Roles = "Admin,QualityManager,AuditorInternal,Auditee")]
+    [Authorize(Roles = "QualityManager,AuditorInternal")]
     public async Task<IActionResult> Create(Guid findingId, [FromBody] CreateCapaRequest req)
     {
         var finding = await db.Findings.FindAsync(findingId);

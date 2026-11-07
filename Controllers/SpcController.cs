@@ -216,7 +216,7 @@ public class SpcController(AppDbContext db) : ControllerBase
         if (!Guid.TryParse(id, out var guidId))
             return NotFound(new { message = "Format ID tidak valid" });
 
-        var analysis = await db.SpcAnalyses.FindAsync(id);
+        var analysis = await db.SpcAnalyses.FindAsync(guidId);
         if (analysis is null)
             return NotFound(new { message = "Analisis SPC tidak ditemukan" });
 

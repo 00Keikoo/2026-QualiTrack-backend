@@ -20,7 +20,6 @@ public class AuditReportController(
     ILogger<AuditReportController> logger) : ControllerBase
 {
     [HttpGet]
-
     public async Task<IActionResult> GetAll(
         [FromQuery] string? standard,
         [FromQuery] string? department,
@@ -40,6 +39,7 @@ public class AuditReportController(
             query = query.Where(s => s.Schedule.AuditPlan.Year == year.Value);
 
         var sessions = await query
+            .AsSplitQuery()
             .Include(s => s.Schedule)
                 .ThenInclude(sch => sch.AuditPlan)
             .Include(s => s.Schedule)
@@ -49,13 +49,6 @@ public class AuditReportController(
                 .ThenInclude(f => f.Category!)
             .Include(s => s.Findings)
                 .ThenInclude(f => f.Capa)
-                .ThenInclude(c => c!.Status!)
-            .Include(s => s.Findings)
-                .ThenInclude(f => f.Evidences)
-            .Include(s => s.Responses)
-                .ThenInclude(r => r.Evidences)
-            .Include(s => s.Responses)
-                .ThenInclude(r => r.ChecklistItem)
             .ToListAsync();
 
         var result = new List<AuditReportListItemDto>();
